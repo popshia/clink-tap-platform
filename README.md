@@ -20,10 +20,10 @@ A web application for analyzing traffic videos from aerial (drone) footage. Uplo
 | `c`  | Car           |
 | `t`  | Truck         |
 | `b`  | Bus           |
-| `h`  | Heavy Truck   |
-| `g`  | (custom)      |
-| `p`  | (custom)      |
-| `u`  | (custom)      |
+| `h`  | Truck Head   |
+| `g`  | Truck Tail|
+| `p`  | pedestrian      |
+| `u`  | bike      |
 | `m`  | Motorcycle    |
 
 ---
