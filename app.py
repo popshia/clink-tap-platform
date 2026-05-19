@@ -1,9 +1,11 @@
+import io
 import os
 import queue
 import threading
 import uuid
+import zipfile
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
 
 import config
@@ -154,10 +156,54 @@ def download_video(job_id):
         return jsonify({"error": "Job not found"}), 404
     if job["status"] != "done" or not job["output_filename"]:
         return jsonify({"error": "Video not ready yet"}), 400
+    output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
     return send_from_directory(
-        config.PROCESSED_FOLDER,
+        output_dir,
         job["output_filename"],
         as_attachment=True,
+    )
+
+
+@app.route("/api/download/<job_id>/csv")
+def download_csv(job_id):
+    """Serve the processed CSV file."""
+    job = jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    if job["status"] != "done":
+        return jsonify({"error": "CSV not ready yet"}), 400
+    output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
+    return send_from_directory(
+        output_dir,
+        "processed.csv",
+        as_attachment=True,
+    )
+
+
+@app.route("/api/download/<job_id>/zip")
+def download_zip(job_id):
+    """Stream a ZIP containing the processed video and CSV."""
+    job = jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    if job["status"] != "done" or not job["output_filename"]:
+        return jsonify({"error": "Results not ready yet"}), 400
+
+    output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
+    video_path = os.path.join(output_dir, job["output_filename"])
+    csv_path = os.path.join(output_dir, "processed.csv")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
+        zf.write(video_path, job["output_filename"])
+        zf.write(csv_path, "processed.csv")
+    buf.seek(0)
+
+    return send_file(
+        buf,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"{job_id}.zip",
     )
 
 

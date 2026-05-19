@@ -52,8 +52,8 @@
         <button class="btn btn-ghost" @click="$emit('reset')">
           Process Another
         </button>
-        <a :href="downloadUrl" class="btn btn-primary" style="text-decoration: none" download>
-          Download Video
+        <a :href="downloadZipUrl" class="btn btn-primary" style="text-decoration: none" :download="`${jobId}.zip`">
+          Download Results
         </a>
       </div>
     </div>
@@ -104,8 +104,8 @@ export default {
       const currentStep = this.steps.find(s => s.id === this.stage)
       return currentStep ? currentStep.desc : 'Waiting in queue…'
     },
-    downloadUrl() {
-      return `/api/download/${this.jobId}`
+    downloadZipUrl() {
+      return `/api/download/${this.jobId}/zip`
     },
     currentStageIndex() {
       return STAGES.indexOf(this.stage)
