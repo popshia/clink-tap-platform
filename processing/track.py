@@ -207,9 +207,9 @@ def track_and_output_csv(
                     obj_id,
                     info["enter_frame"],
                     info["exit_frame"],
+                    "X",
+                    "X",
                     info["cls_idx"],
-                    "X",
-                    "X",
                 ]
                 for frame_num in sorted(info["coords"].keys()):
                     row.extend(info["coords"][frame_num])
