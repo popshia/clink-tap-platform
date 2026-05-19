@@ -1,13 +1,13 @@
 [project]
 name = "ttgui-web"
 version = "0.1.0"
-requires-python = ">=3.14"
+requires-python = "==3.10.*"
 dependencies = [
     "flask>=3.0",
     "flask-cors>=4.0",
     "lapx>=0.5",
     "loguru>=0.7.3",
-    "numpy>=1.24",
+    "numpy<2.0",
     "opencv-python>=4.8",
     "tqdm>=4.67.3",
     "ultralytics>=8.0",
