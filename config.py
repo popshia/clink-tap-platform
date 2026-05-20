@@ -7,7 +7,7 @@ PROCESSED_FOLDER = os.path.join(BASE_DIR, "processed")
 MODEL_PATH = os.path.join(BASE_DIR, "processing", "models", "yolov11_obb.pt")
 
 # --- Flask ---
-MAX_CONTENT_LENGTH = 500 * 1024 * 1024  # 500 MB upload limit
+MAX_CONTENT_LENGTH = 10 * 1024 * 1024 * 1024  # 10 GB upload limit
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
 
 # --- Server ---

@@ -143,7 +143,7 @@ npm run dev
 
 **Processing stages (in order):** `queued` → `stabilizing` → `tracking` → `csv_postprocess` → `emailing` → `done`
 
-**Accepted video formats:** `mp4`, `avi`, `mov`, `mkv`, `webm` (max 500 MB)
+**Accepted video formats:** `mp4`, `avi`, `mov`, `mkv`, `webm` (max 10 GB)
 
 ---
 
