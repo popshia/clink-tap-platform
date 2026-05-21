@@ -149,7 +149,9 @@ def track_and_output_csv(
                 frame,
                 persist=True,
                 tracker="./botsort.yaml",
-                device="mps" if torch.backends.mps.is_available() else "1",
+                device="cuda:1"
+                if torch.cuda.is_available()
+                else ("mps" if torch.backends.mps.is_available() else "cpu"),
             )[0]
             obb = result.obb if result.obb is not None else None
 
