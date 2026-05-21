@@ -143,7 +143,6 @@ def track_and_output_csv(
         success, frame = cap.read()
 
         if success:
-            frame_index += 1
             # Run YOLO26 tracking on the frame, persisting tracks between frames
             result = model.track(
                 frame,
