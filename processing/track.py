@@ -191,6 +191,9 @@ def track_and_output_csv(
             # Write the annotated frame to the output video
             out.write(frame)
 
+            # advance frame_index
+            frame_index += 1
+
         else:
             # Break the loop if the end of the video is reached
             break
