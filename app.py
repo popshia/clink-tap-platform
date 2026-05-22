@@ -77,7 +77,7 @@ def process_job(job_id: str):
 
         # Send email
         on_progress("emailing", 0)
-        download_url = f"{config.SERVER_URL}/api/download/{job_id}"
+        download_url = f"{config.SERVER_URL}/api/download/{job_id}/zip"
         send_result_email(job["email"], download_url, job_id)
 
         job["status"] = "done"
