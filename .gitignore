@@ -215,3 +215,5 @@ test/
 uv.lock
 .claude/
 processing/tools/*.txt
+frontend/frontend.txt
+backend.txt
