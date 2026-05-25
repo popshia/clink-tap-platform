@@ -213,3 +213,5 @@ processed/
 processing/models/*
 test/
 uv.lock
+.claude/
+processing/tools/*.txt
