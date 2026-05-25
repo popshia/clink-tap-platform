@@ -43,14 +43,14 @@ def track_and_output_csv(
 
     class_map = {0: "c", 1: "t", 2: "b", 3: "h", 4: "g", 5: "p", 6: "u", 7: "m"}
     class_colors = {
-        0: (0, 114, 189),  # c — blue
-        1: (217, 83, 25),  # t — orange
-        2: (237, 177, 32),  # b — yellow
-        3: (126, 47, 142),  # h — purple
-        4: (119, 172, 48),  # g — green
-        5: (77, 190, 238),  # p — cyan
-        6: (162, 20, 47),  # u — red
-        7: (0, 128, 128),  # m — teal
+        0: (189, 114,   0),  # c — blue
+        1: ( 25,  83, 217),  # t — orange
+        2: ( 32, 177, 237),  # b — yellow
+        3: (142,  47, 126),  # h — purple
+        4: ( 48, 172, 119),  # g — green
+        5: (238, 190,  77),  # p — cyan
+        6: ( 47,  20, 162),  # u — red
+        7: (128, 128,   0),  # m — teal
     }
 
     track_info = {}
@@ -99,8 +99,9 @@ def track_and_output_csv(
                 track_info[t_id]["exit_frame"] = frame_index
                 track_info[t_id]["coords"][frame_index] = corners.flatten().tolist()
 
+                color = class_colors.get(int(cls_raw), (255, 255, 255))
                 cv2.polylines(
-                    annotated, [corners.reshape((-1, 1, 2))], True, (0, 255, 0), 2
+                    annotated, [corners.reshape((-1, 1, 2))], True, color, 2
                 )
                 cv2.putText(
                     annotated,
@@ -108,7 +109,7 @@ def track_and_output_csv(
                     tuple(corners[0]),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.6,
-                    (0, 255, 0),
+                    color,
                     2,
                 )
 
