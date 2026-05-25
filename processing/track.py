@@ -42,6 +42,16 @@ def track_and_output_csv(
     out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
 
     class_map = {0: "c", 1: "t", 2: "b", 3: "h", 4: "g", 5: "p", 6: "u", 7: "m"}
+    class_colors = {
+        0: (0, 114, 189),  # c — blue
+        1: (217, 83, 25),  # t — orange
+        2: (237, 177, 32),  # b — yellow
+        3: (126, 47, 142),  # h — purple
+        4: (119, 172, 48),  # g — green
+        5: (77, 190, 238),  # p — cyan
+        6: (162, 20, 47),  # u — red
+        7: (0, 128, 128),  # m — teal
+    }
 
     track_info = {}
     frame_index = 0
