@@ -150,7 +150,7 @@ def stabilize_video(
             out.write(curr_resized)
 
         frame_idx += 1
-        if frame_idx % 10 == 0:
+        if frame_idx % 100 == 0:
             logger.info(f"ECC GPU: Stabilized {frame_idx}/{total_frames} frames")
 
     cap.release()
