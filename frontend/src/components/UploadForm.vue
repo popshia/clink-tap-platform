@@ -79,19 +79,18 @@
             Upload & Analysis
         </button>
 
-        <div v-else-if="uploadState === 'uploading'" class="progress-wrap">
-            <div class="progress-bar">
-                <div
-                    class="progress-fill"
-                    :style="{ width: uploadProgress + '%' }"
-                ></div>
-            </div>
-            <span class="progress-label">Uploading {{ uploadProgress }}%</span>
-        </div>
+        <button
+            v-else-if="uploadState === 'uploading'"
+            class="btn btn-submit btn-uploading"
+            :style="{ '--progress': uploadProgress + '%' }"
+            disabled
+        >
+            Uploading {{ uploadProgress }}%
+        </button>
 
         <button
             v-else-if="uploadState === 'failed'"
-            class="btn btn-retry btn-submit"
+            class="btn btn-submit btn-failed"
             @click="submit"
         >
             ↺ Retry Upload
@@ -355,7 +354,28 @@ export default {
     letter-spacing: 0.2px;
 }
 
-.btn-retry {
+.btn-uploading {
+    background: var(--accent-light);
+    color: var(--text-primary);
+    border: 1.5px solid var(--accent);
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+}
+
+.btn-uploading::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: var(--progress, 0%);
+    background: var(--accent);
+    opacity: 0.35;
+    transition: width 0.25s ease;
+}
+
+.btn-failed {
     background: var(--error);
     color: white;
     border: none;
@@ -363,36 +383,8 @@ export default {
     transition: background 0.2s;
 }
 
-.btn-retry:hover {
+.btn-failed:hover {
     background: rgba(220, 38, 38, 0.85);
-}
-
-/* Progress bar */
-.progress-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.progress-bar {
-    width: 100%;
-    height: 8px;
-    background: var(--accent-light);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 100%;
-    background: var(--accent);
-    transition: width 0.25s ease;
-}
-
-.progress-label {
-    text-align: center;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-secondary);
 }
 
 /* Error */
