@@ -1,6 +1,7 @@
 import io
 import os
 import queue
+import shutil
 import threading
 import uuid
 import zipfile
@@ -28,6 +29,10 @@ os.makedirs(config.PROCESSED_FOLDER, exist_ok=True)
 # ---------------------------------------------------------------------------
 jobs: dict = {}
 job_queue = queue.Queue()
+
+# Tracks in-progress chunked uploads before they are enqueued as jobs
+pending_uploads: dict = {}
+_pending_lock = threading.Lock()
 
 STAGES = ["queued", "stabilizing", "tracking", "csv_postprocess", "emailing", "done"]
 
@@ -129,6 +134,80 @@ def upload_video():
     job_queue.put(job_id)
 
     return jsonify({"job_id": job_id}), 202
+
+
+@app.route("/api/upload/init", methods=["POST"])
+def upload_init():
+    """Allocate a job_id and chunk staging directory for a chunked upload."""
+    data = request.get_json(silent=True) or {}
+    filename = data.get("filename", "")
+    email = data.get("email", "").strip()
+    total_chunks = int(data.get("total_chunks", 1))
+
+    if not email:
+        return jsonify({"error": "Email address is required"}), 400
+    if not filename or not allowed_file(filename):
+        return jsonify({"error": "Invalid or unsupported video file"}), 400
+
+    job_id = uuid.uuid4().hex[:4]
+    ext = filename.rsplit(".", 1)[1].lower()
+    base = filename.rsplit(".", 1)[0]
+    safe_name = f"{job_id}_{base}.{ext}"
+    chunk_dir = os.path.join(config.UPLOAD_FOLDER, f"{job_id}_chunks")
+    os.makedirs(chunk_dir, exist_ok=True)
+
+    pending_uploads[job_id] = {
+        "email": email,
+        "filename": safe_name,
+        "total_chunks": total_chunks,
+        "received": 0,
+        "chunk_dir": chunk_dir,
+    }
+    return jsonify({"job_id": job_id}), 200
+
+
+@app.route("/api/upload/chunk", methods=["POST"])
+def upload_chunk():
+    """Receive one chunk and, when all chunks are in, assemble the file and queue the job."""
+    job_id = request.form.get("job_id")
+    chunk_index = request.form.get("chunk_index", type=int)
+    chunk = request.files.get("chunk")
+
+    if job_id not in pending_uploads or chunk_index is None or not chunk:
+        return jsonify({"error": "Invalid chunk request"}), 400
+
+    upload = pending_uploads[job_id]
+    chunk.save(os.path.join(upload["chunk_dir"], f"{chunk_index:06d}"))
+
+    with _pending_lock:
+        upload["received"] += 1
+        should_finalize = upload["received"] >= upload["total_chunks"]
+
+    if not should_finalize:
+        return jsonify({"received": upload["received"]}), 200
+
+    # All chunks received — concatenate into the final file and create the job.
+    final_path = os.path.join(config.UPLOAD_FOLDER, upload["filename"])
+    try:
+        with open(final_path, "wb") as out_f:
+            for i in range(upload["total_chunks"]):
+                with open(os.path.join(upload["chunk_dir"], f"{i:06d}"), "rb") as cf:
+                    shutil.copyfileobj(cf, out_f)
+    finally:
+        shutil.rmtree(upload["chunk_dir"], ignore_errors=True)
+        pending_uploads.pop(job_id, None)
+
+    jobs[job_id] = {
+        "status": "processing",
+        "stage": "queued",
+        "progress": 0,
+        "error": None,
+        "email": upload["email"],
+        "filename": upload["filename"],
+        "output_filename": None,
+    }
+    job_queue.put(job_id)
+    return jsonify({"job_id": job_id, "done": True}), 202
 
 
 @app.route("/api/status/<job_id>")

@@ -50,18 +50,33 @@
         v-model="email"
         type="email"
         class="input-field"
-        :disabled="uploading"
+        :disabled="uploadState === 'uploading'"
       />
     </div>
 
-    <!-- Submit -->
+    <!-- Upload button / progress bar / retry button -->
     <button
+      v-if="uploadState === 'idle'"
       class="btn btn-primary btn-submit"
       :disabled="!canSubmit"
       @click="submit"
     >
-      <span v-if="uploading" class="spinner"></span>
-      {{ uploading ? 'Uploading…' : 'Upload & Analysis' }}
+      Upload & Analysis
+    </button>
+
+    <div v-else-if="uploadState === 'uploading'" class="progress-wrap">
+      <div class="progress-bar">
+        <div class="progress-fill" :style="{ width: uploadProgress + '%' }"></div>
+      </div>
+      <span class="progress-label">Uploading {{ uploadProgress }}%</span>
+    </div>
+
+    <button
+      v-else-if="uploadState === 'failed'"
+      class="btn btn-retry btn-submit"
+      @click="submit"
+    >
+      ↺ Retry Upload
     </button>
 
     <!-- Error message -->
@@ -70,6 +85,8 @@
 </template>
 
 <script>
+const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB
+
 export default {
   name: 'UploadForm',
   emits: ['job-started'],
@@ -78,13 +95,14 @@ export default {
       selectedFile: null,
       email: '',
       isDragging: false,
-      uploading: false,
+      uploadState: 'idle', // 'idle' | 'uploading' | 'failed'
+      uploadProgress: 0,
       errorMsg: '',
     }
   },
   computed: {
     canSubmit() {
-      return this.selectedFile && this.email.trim() && !this.uploading
+      return this.selectedFile && this.email.trim()
     },
   },
   methods: {
@@ -115,27 +133,51 @@ export default {
       return (bytes / 1048576).toFixed(1) + ' MB'
     },
     async submit() {
-      this.uploading = true
+      this.uploadState = 'uploading'
+      this.uploadProgress = 0
       this.errorMsg = ''
 
-      const formData = new FormData()
-      formData.append('video', this.selectedFile)
-      formData.append('email', this.email.trim())
+      const file = this.selectedFile
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
 
       try {
-        const res = await fetch('/api/upload', { method: 'POST', body: formData })
-        const data = await res.json()
+        // 1. Init — get a job_id and reserve a chunk staging directory
+        const initRes = await fetch('/api/upload/init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: file.name,
+            email: this.email.trim(),
+            total_chunks: totalChunks,
+          }),
+        })
+        if (!initRes.ok) {
+          const err = await initRes.json()
+          throw new Error(err.error || 'Failed to initialize upload.')
+        }
+        const { job_id } = await initRes.json()
 
-        if (!res.ok) {
-          this.errorMsg = data.error || 'Upload failed.'
-          return
+        // 2. Upload chunks sequentially, updating progress after each
+        for (let i = 0; i < totalChunks; i++) {
+          const form = new FormData()
+          form.append('job_id', job_id)
+          form.append('chunk_index', i)
+          form.append('chunk', file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE))
+
+          const res = await fetch('/api/upload/chunk', { method: 'POST', body: form })
+          if (!res.ok) {
+            const err = await res.json()
+            throw new Error(err.error || `Chunk ${i + 1}/${totalChunks} failed.`)
+          }
+
+          this.uploadProgress = Math.round(((i + 1) / totalChunks) * 100)
         }
 
-        this.$emit('job-started', data.job_id)
+        this.uploadState = 'idle'
+        this.$emit('job-started', job_id)
       } catch (err) {
-        this.errorMsg = 'Network error. Is the server running?'
-      } finally {
-        this.uploading = false
+        this.errorMsg = err.message
+        this.uploadState = 'failed'
       }
     },
   },
@@ -271,7 +313,7 @@ export default {
   margin-bottom: 6px;
 }
 
-/* Submit */
+/* Submit / retry */
 .btn-submit {
   width: 100%;
   padding: 13px;
@@ -280,13 +322,44 @@ export default {
   letter-spacing: 0.2px;
 }
 
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
+.btn-retry {
+  background: var(--error);
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-retry:hover {
+  background: rgba(220, 38, 38, 0.85);
+}
+
+/* Progress bar */
+.progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 48px;
+  background: var(--accent-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
+.progress-label {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
 /* Error */
