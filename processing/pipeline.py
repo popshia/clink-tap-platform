@@ -62,12 +62,18 @@ def run_pipeline(
         output_dir, f"{input_path.split('/')[-1].split('.')[0]}_stabilized{ext}"
     )
     log("stabilizing", 0)
-    stabilize_video(input_path, stabilized_path, (1920, 1080), 0.5)
+    stabilize_video(
+        input_path,
+        stabilized_path,
+        (1920, 1080),
+        0.5,
+        on_progress=lambda pct: log("stabilizing", pct),
+    )
     log("stabilizing", 100)
 
     # ── Stage 2: Object Detect & Tracking ──
     tracked_path = os.path.join(
-        output_dir, f"{input_path.split('/')[-1].split('.')[0]}_detected{ext}"
+        output_dir, f"{input_path.split('/')[-1].split('.')[0]}_tracked{ext}"
     )
     raw_csv = os.path.join(output_dir, "raw.csv")
     log("tracking", 0)
@@ -76,6 +82,7 @@ def run_pipeline(
         tracked_path,
         config.MODEL_PATH,
         os.path.join(output_dir, raw_csv),
+        on_progress=lambda pct: log("tracking", pct),
     )
     log("tracking", 100)
 

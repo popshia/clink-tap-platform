@@ -31,6 +31,7 @@ def track_and_output_csv(
     output_video_path,
     model_path,
     output_csv_path,
+    on_progress=None,
 ):
     model = YOLO(model_path)
 
@@ -56,6 +57,7 @@ def track_and_output_csv(
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
@@ -74,6 +76,7 @@ def track_and_output_csv(
 
     track_info = {}
     frame_index = 0
+    last_pct = -1
 
     while cap.isOpened():
         success, frame = cap.read()
@@ -132,6 +135,11 @@ def track_and_output_csv(
 
         out.write(annotated)
         frame_index += 1
+        if on_progress and total_frames > 0:
+            pct = min(99, int(frame_index / total_frames * 100))
+            if pct != last_pct:
+                on_progress(pct)
+                last_pct = pct
 
     cap.release()
     out.release()

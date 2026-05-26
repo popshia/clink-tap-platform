@@ -21,6 +21,7 @@ def stabilize_video(
     output_path: str,
     output_size,
     reg_scale: float = 1.0,
+    on_progress=None,
 ):
     """
     Stabilize video using Kornia's GPU-accelerated ImageRegistrator (homography).
@@ -106,6 +107,7 @@ def stabilize_video(
     target_pyr = build_pyramid(target_gray, pyramid_levels)[::-1]
 
     frame_idx = 1
+    last_pct = -1
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -150,6 +152,11 @@ def stabilize_video(
             out.write(curr_resized)
 
         frame_idx += 1
+        if on_progress and total_frames > 0:
+            pct = min(99, int(frame_idx / total_frames * 100))
+            if pct != last_pct:
+                on_progress(pct)
+                last_pct = pct
         if frame_idx % 100 == 0:
             logger.info(f"ECC GPU: Stabilized {frame_idx}/{total_frames} frames")
 
