@@ -376,7 +376,7 @@ export default {
 
 .progress-bar {
     width: 100%;
-    height: 16;
+    height: 8px;
     background: var(--accent-light);
     border-radius: var(--radius-md);
     overflow: hidden;
