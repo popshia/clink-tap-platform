@@ -5,7 +5,15 @@ import kornia.color as KC
 import kornia.geometry as KG
 import numpy as np
 import torch
+from kornia.geometry.transform import build_pyramid
 from loguru import logger
+
+
+def _ecc_loss(warped: torch.Tensor, template: torch.Tensor) -> torch.Tensor:
+    """Enhanced Correlation Coefficient loss — illumination-invariant, range [0, 2]."""
+    t = template - template.mean()
+    w = warped - warped.mean()
+    return 1.0 - (t * w).sum() / (t.norm() * w.norm() + 1e-8)
 
 
 def ecc_stabilize(input_path: str, output_path: str, output_size):
@@ -159,28 +167,18 @@ def ecc_stabilize_gpu(
 
     target_gray = to_gray_tensor(first_resized)
 
-    # Build the registrator but drive the optimization loop manually.
-    # register() resets to identity every call — bypassing it lets model parameters
-    # carry over frame-to-frame, giving a true warm start. With warm start each frame
-    # is already near the solution, so 30 iterations per pyramid level is enough
-    # instead of 200, cutting total Adam steps from ~1000 to ~90 per frame.
+    # Use ECC loss (illumination-invariant, same criterion as OpenCV findTransformECC)
+    # with LBFGS (quasi-Newton) instead of Adam — LBFGS converges in ~5-10 steps
+    # vs 30+ for Adam, matching the speed of Gauss-Newton in OpenCV's ECC.
+    # Model parameters persist across frames for a warm start; LBFGS optimizer is
+    # recreated per pyramid level to avoid stale curvature history across scales.
     pyramid_levels = 3
-    num_iterations = 30
-    tolerance = 1e-4
-    lr = 1e-3
 
     registrator = KG.ImageRegistrator(
         model_type="homography",
+        loss_fn=_ecc_loss,
         pyramid_levels=pyramid_levels,
-        lr=lr,
-        num_iterations=num_iterations,
-        tolerance=tolerance,
     ).to(device)
-
-    from kornia.geometry.transform import build_pyramid
-
-    # Persistent optimizer — lives across frames so Adam momentum also warm-starts.
-    opt = torch.optim.Adam(registrator.model.parameters(), lr=lr)
 
     # Pre-build the template pyramid once; it never changes.
     target_pyr = build_pyramid(target_gray, pyramid_levels)[::-1]
@@ -198,18 +196,24 @@ def ecc_stabilize_gpu(
         try:
             curr_pyr = build_pyramid(curr_gray, pyramid_levels)[::-1]
 
-            prev_loss = 1e10
             for src_level, dst_level in zip(curr_pyr, target_pyr):
-                for _ in range(num_iterations):
+                # New LBFGS per level — avoids stale curvature from previous scale.
+                # Model params (homography) carry over as the warm start.
+                opt = torch.optim.LBFGS(
+                    registrator.model.parameters(),
+                    lr=0.1,
+                    max_iter=10,
+                    line_search_fn="strong_wolfe",
+                )
+
+                def closure(sl=src_level, dl=dst_level):
                     opt.zero_grad()
-                    loss = registrator.get_single_level_loss(src_level, dst_level, registrator.model())
-                    loss += registrator.get_single_level_loss(dst_level, src_level, registrator.model.forward_inverse())
-                    curr_loss = loss.item()
-                    if abs(curr_loss - prev_loss) < tolerance:
-                        break
-                    prev_loss = curr_loss
+                    loss = registrator.get_single_level_loss(sl, dl, registrator.model())
+                    loss += registrator.get_single_level_loss(dl, sl, registrator.model.forward_inverse())
                     loss.backward()
-                    opt.step()
+                    return loss
+
+                opt.step(closure)
 
             stabilized_tensor = registrator.warp_src_into_dst(curr_tensor)
             out.write(to_bgr(stabilized_tensor))
