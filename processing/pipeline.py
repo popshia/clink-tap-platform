@@ -95,8 +95,8 @@ def run_pipeline(
     elapsed = time.perf_counter() - start
     logger.info(f"Processing time: {format_duration(elapsed)}")
 
-    # Clean up intermediate files (keep only the final output)
-    for intermediate in [stabilized_path, raw_csv]:
+    # Clean up input and intermediate files (keep only the final output)
+    for intermediate in [input_path, stabilized_path, raw_csv]:
         try:
             os.remove(intermediate)
         except OSError:

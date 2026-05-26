@@ -21,7 +21,6 @@ app.config["MAX_CONTENT_LENGTH"] = config.MAX_CONTENT_LENGTH
 app.secret_key = config.SECRET_KEY
 CORS(app)
 
-os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(config.PROCESSED_FOLDER, exist_ok=True)
 
 # ---------------------------------------------------------------------------
@@ -68,10 +67,8 @@ threading.Thread(target=worker, daemon=True).start()
 def process_job(job_id: str):
     """Run the full pipeline in a background thread."""
     job = jobs[job_id]
-    input_path = os.path.join(config.UPLOAD_FOLDER, job["filename"])
-    # output_dir = config.PROCESSED_FOLDER + "/" + job_id
     output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
-    os.makedirs(output_dir, exist_ok=True)
+    input_path = os.path.join(output_dir, job["filename"])
 
     def on_progress(stage: str, progress: int = 0):
         job["stage"] = stage
@@ -98,44 +95,6 @@ def process_job(job_id: str):
 # ---------------------------------------------------------------------------
 # API routes
 # ---------------------------------------------------------------------------
-@app.route("/api/upload", methods=["POST"])
-def upload_video():
-    """Accept a video file + email and kick off processing."""
-    if "video" not in request.files:
-        return jsonify({"error": "No video file provided"}), 400
-
-    file = request.files["video"]
-    email = request.form.get("email", "").strip()
-
-    if not email:
-        return jsonify({"error": "Email address is required"}), 400
-    if file.filename == "" or not allowed_file(file.filename):
-        return jsonify({"error": "Invalid or unsupported video file"}), 400
-
-    # Save uploaded file
-    job_id = uuid.uuid4().hex[:4]
-    filename = file.filename.rsplit(".", 1)[0]
-    ext = file.filename.rsplit(".", 1)[1].lower()
-    safe_name = f"{job_id}_{filename}.{ext}"
-    file.save(os.path.join(config.UPLOAD_FOLDER, safe_name))
-
-    # Create job record
-    jobs[job_id] = {
-        "status": "processing",
-        "stage": "queued",
-        "progress": 0,
-        "error": None,
-        "email": email,
-        "filename": safe_name,
-        "output_filename": None,
-    }
-
-    # Add job to the queue
-    job_queue.put(job_id)
-
-    return jsonify({"job_id": job_id}), 202
-
-
 @app.route("/api/upload/init", methods=["POST"])
 def upload_init():
     """Allocate a job_id and chunk staging directory for a chunked upload."""
@@ -153,7 +112,8 @@ def upload_init():
     ext = filename.rsplit(".", 1)[1].lower()
     base = filename.rsplit(".", 1)[0]
     safe_name = f"{job_id}_{base}.{ext}"
-    chunk_dir = os.path.join(config.UPLOAD_FOLDER, f"{job_id}_chunks")
+    output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
+    chunk_dir = os.path.join(output_dir, "_chunks")
     os.makedirs(chunk_dir, exist_ok=True)
 
     pending_uploads[job_id] = {
@@ -162,6 +122,7 @@ def upload_init():
         "total_chunks": total_chunks,
         "received": 0,
         "chunk_dir": chunk_dir,
+        "output_dir": output_dir,
     }
     return jsonify({"job_id": job_id}), 200
 
@@ -187,7 +148,7 @@ def upload_chunk():
         return jsonify({"received": upload["received"]}), 200
 
     # All chunks received — concatenate into the final file and create the job.
-    final_path = os.path.join(config.UPLOAD_FOLDER, upload["filename"])
+    final_path = os.path.join(upload["output_dir"], upload["filename"])
     try:
         with open(final_path, "wb") as out_f:
             for i in range(upload["total_chunks"]):
