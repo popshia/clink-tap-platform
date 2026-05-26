@@ -371,7 +371,7 @@ export default {
 }
 
 .btn-uploading::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
@@ -399,7 +399,7 @@ export default {
     text-align: center;
     color: var(--text-muted);
     font-size: 11px;
-    margin-top: 8px;
+    margin-top: 24px;
 }
 
 .job-id code {
