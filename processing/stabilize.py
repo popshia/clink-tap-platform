@@ -99,13 +99,11 @@ def ecc_stabilize_gpu(
     Runs gradient-descent ECC on CUDA/MPS tensors via a multi-scale pyramid.
     Falls back to CPU Kornia if no GPU is available.
     """
-    if device is None:
-        if torch.cuda.is_available():
-            device = "cuda"
-        elif torch.backends.mps.is_available():
-            device = "mps"
-        else:
-            device = "cpu"
+    device = (
+        "cuda:1"
+        if torch.cuda.is_available()
+        else ("mps" if torch.backends.mps.is_available() else "cpu")
+    )
 
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
