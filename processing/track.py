@@ -14,9 +14,14 @@ def _patched_iou_batch_obb(bboxes1, bboxes2):
     N, M = len(bboxes1), len(bboxes2)
     if N == 0 or M == 0:
         return np.zeros((N, M))
+
     def wrapper(i, j):
         return iou_obb_pair(i, j, bboxes1, bboxes2)
-    return np.fromfunction(np.vectorize(wrapper, otypes=[float]), shape=(N, M), dtype=int)
+
+    return np.fromfunction(
+        np.vectorize(wrapper, otypes=[float]), shape=(N, M), dtype=int
+    )
+
 
 AssociationFunction.iou_batch_obb = _patched_iou_batch_obb
 
@@ -30,7 +35,7 @@ def track_and_output_csv(
     model = YOLO(model_path)
 
     device = (
-        "cuda:1"
+        "cuda"
         if torch.cuda.is_available()
         else ("mps" if torch.backends.mps.is_available() else "cpu")
     )
@@ -57,14 +62,14 @@ def track_and_output_csv(
 
     class_map = {0: "c", 1: "t", 2: "b", 3: "h", 4: "g", 5: "p", 6: "u", 7: "m"}
     class_colors = {
-        0: (189, 114,   0),  # c — blue
-        1: ( 25,  83, 217),  # t — orange
-        2: ( 32, 177, 237),  # b — yellow
-        3: (142,  47, 126),  # h — purple
-        4: ( 48, 172, 119),  # g — green
-        5: (238, 190,  77),  # p — cyan
-        6: ( 47,  20, 162),  # u — red
-        7: (128, 128,   0),  # m — teal
+        0: (189, 114, 0),  # c — blue
+        1: (25, 83, 217),  # t — orange
+        2: (32, 177, 237),  # b — yellow
+        3: (142, 47, 126),  # h — purple
+        4: (48, 172, 119),  # g — green
+        5: (238, 190, 77),  # p — cyan
+        6: (47, 20, 162),  # u — red
+        7: (128, 128, 0),  # m — teal
     }
 
     track_info = {}
@@ -114,9 +119,7 @@ def track_and_output_csv(
                 track_info[t_id]["coords"][frame_index] = corners.flatten().tolist()
 
                 color = class_colors.get(int(cls_raw), (255, 255, 255))
-                cv2.polylines(
-                    annotated, [corners.reshape((-1, 1, 2))], True, color, 2
-                )
+                cv2.polylines(annotated, [corners.reshape((-1, 1, 2))], True, color, 2)
                 cv2.putText(
                     annotated,
                     f"{cls_idx} {t_id}",

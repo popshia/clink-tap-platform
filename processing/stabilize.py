@@ -100,7 +100,7 @@ def ecc_stabilize_gpu(
     Falls back to CPU Kornia if no GPU is available.
     """
     device = (
-        "cuda:1"
+        "cuda"
         if torch.cuda.is_available()
         else ("mps" if torch.backends.mps.is_available() else "cpu")
     )
