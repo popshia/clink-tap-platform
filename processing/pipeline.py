@@ -3,6 +3,7 @@ Processing Pipeline – orchestrates stabilization → detection → tracking.
 """
 
 import os
+import time
 from typing import Callable, Optional
 
 from loguru import logger
@@ -13,7 +14,22 @@ from processing.stabilize import stabilize_video
 from processing.track import track_and_output_csv
 
 
-def run_pipeline(
+def format_duration(seconds: float) -> str:
+    seconds = int(seconds)
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    parts = []
+
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}min")
+
+    parts.append(f"{seconds}sec")
+    return " ".join(parts)
+
+
+def run_gipeline(
     input_path: str,
     output_dir: str,
     job_id: str,
@@ -38,6 +54,8 @@ def run_pipeline(
         logger.info(f"[PIPELINE] {job_id} | {stage} ({pct}%)")
 
     ext = os.path.splitext(input_path)[1] or ".mp4"
+
+    start = time.perf_counter()
 
     # ── Stage 1: Video Stabilization ──
     stabilized_path = os.path.join(
@@ -66,6 +84,9 @@ def run_pipeline(
     log("csv_postprocess", 0)
     process_trajectory_file(raw_csv, processed_csv)
     log("csv_postprocess", 100)
+
+    elapsed = time.perf_counter() - start
+    logger.info(f"Execution time: {format_duration(elapsed)}")
 
     # Clean up intermediate files (keep only the final output)
     # for intermediate in [stabilized_path, raw_csv]:
