@@ -5,7 +5,20 @@ import cv2
 import numpy as np
 import torch
 from boxmot.trackers.ocsort.ocsort import OcSort
+from boxmot.utils.iou import AssociationFunction, iou_obb_pair
 from ultralytics import YOLO
+
+
+@staticmethod
+def _patched_iou_batch_obb(bboxes1, bboxes2):
+    N, M = len(bboxes1), len(bboxes2)
+    if N == 0 or M == 0:
+        return np.zeros((N, M))
+    def wrapper(i, j):
+        return iou_obb_pair(i, j, bboxes1, bboxes2)
+    return np.fromfunction(np.vectorize(wrapper, otypes=[float]), shape=(N, M), dtype=int)
+
+AssociationFunction.iou_batch_obb = _patched_iou_batch_obb
 
 
 def track_and_output_csv(
@@ -25,6 +38,7 @@ def track_and_output_csv(
     # is_obb=True  → input [cx,cy,w,h,angle_rad,conf,cls], uses rotated IoU automatically
     # per_class=True → class-aware tracking (objects of different classes never merge IDs)
     tracker = OcSort(
+        is_obb=True,
         per_class=True,
         det_thresh=0.3,
         max_age=30,
