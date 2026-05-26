@@ -96,6 +96,11 @@
             ↺ Retry Upload
         </button>
 
+        <!-- Job ID (shown during upload and on failure) -->
+        <p v-if="jobId && uploadState !== 'idle'" class="job-id">
+            Job ID: <code>{{ jobId }}</code>
+        </p>
+
         <!-- Error message -->
         <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
     </div>
@@ -115,6 +120,7 @@ export default {
             uploadState: "idle", // 'idle' | 'uploading' | 'failed'
             uploadProgress: 0,
             errorMsg: "",
+            jobId: null,
         };
     },
     computed: {
@@ -175,6 +181,7 @@ export default {
                     );
                 }
                 const { job_id } = await initRes.json();
+                this.jobId = job_id;
 
                 // 2. Upload chunks sequentially, updating progress after each
                 for (let i = 0; i < totalChunks; i++) {
@@ -385,6 +392,22 @@ export default {
 
 .btn-failed:hover {
     background: rgba(220, 38, 38, 0.85);
+}
+
+/* Job ID */
+.job-id {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-top: 8px;
+}
+
+.job-id code {
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    background: rgba(129, 129, 129, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 
 /* Error */
