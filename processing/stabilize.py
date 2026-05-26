@@ -1,124 +1,11 @@
 import argparse
 
 import cv2
+import kornia.color as KC
+import kornia.geometry as KG
 import numpy as np
+import torch
 from loguru import logger
-
-
-def lk_stabilize(
-    input_path: str, output_path: str, output_size, smoothing_radius: int = 30
-):
-    """
-    Stabilize a video using a 2-pass Lucas-Kanade optical flow method.
-    """
-    cap = cv2.VideoCapture(input_path)
-    if not cap.isOpened():
-        raise RuntimeError(f"Cannot open video: {input_path}")
-
-    n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-
-    # Setup Video Writer
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter(output_path, fourcc, fps, output_size)
-
-    # --- PASS 1: Compute frame-to-frame transforms ---
-    transforms = []
-
-    ret, prev_frame = cap.read()
-    if not ret:
-        raise RuntimeError("Cannot read the first frame")
-
-    # Resize first frame to target resolution
-    prev_frame = cv2.resize(prev_frame, output_size, interpolation=cv2.INTER_CUBIC)
-    prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-
-    for i in range(1, n_frames):
-        ret, curr_frame = cap.read()
-        if not ret:
-            break
-
-        curr_frame = cv2.resize(curr_frame, output_size, interpolation=cv2.INTER_CUBIC)
-        curr_gray = cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
-
-        # Detect features to track
-        prev_pts = cv2.goodFeaturesToTrack(
-            prev_gray, maxCorners=200, qualityLevel=0.01, minDistance=30, blockSize=3
-        )
-
-        if prev_pts is not None and len(prev_pts) > 0:
-            curr_pts, status, _ = cv2.calcOpticalFlowPyrLK(
-                prev_gray, curr_gray, prev_pts, None
-            )
-
-            idx = np.where(status.flatten() == 1)[0]
-            prev_pts_good = prev_pts[idx]
-            curr_pts_good = curr_pts[idx]
-
-            if len(prev_pts_good) >= 3:
-                m, _ = cv2.estimateAffinePartial2D(prev_pts_good, curr_pts_good)
-                if m is not None:
-                    dx = m[0, 2]
-                    dy = m[1, 2]
-                    da = np.arctan2(m[1, 0], m[0, 0])
-                    transforms.append((dx, dy, da))
-                else:
-                    transforms.append((0, 0, 0))
-            else:
-                transforms.append((0, 0, 0))
-        else:
-            transforms.append((0, 0, 0))
-
-        prev_gray = curr_gray
-        logger.info(f"LK: Analyzing {i}/{n_frames} frames...")
-
-    # --- CALCULATE SMOOTH TRAJECTORY ---
-    transforms = np.array(transforms)
-    trajectory = np.cumsum(transforms, axis=0)
-    smoothed_trajectory = _smooth(trajectory, smoothing_radius)
-    difference = smoothed_trajectory - trajectory
-    transforms_smooth = transforms + difference
-
-    # --- PASS 2: Apply stabilized transforms ---
-    # Reset video to the beginning
-    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-
-    ret, frame = cap.read()
-    if ret:
-        frame = cv2.resize(frame, output_size, interpolation=cv2.INTER_CUBIC)
-        out.write(frame)
-
-    for i in range(len(transforms_smooth)):
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        frame = cv2.resize(frame, output_size, interpolation=cv2.INTER_CUBIC)
-
-        dx, dy, da = transforms_smooth[i]
-        m = np.array(
-            [[np.cos(da), -np.sin(da), dx], [np.sin(da), np.cos(da), dy]],
-            dtype=np.float64,
-        )
-
-        stabilized = cv2.warpAffine(frame, m, output_size, flags=cv2.INTER_CUBIC)
-        out.write(stabilized)
-        logger.info(f"LK: Rendered {i + 1}/{len(transforms_smooth)} frames...")
-
-    cap.release()
-    out.release()
-
-
-def _smooth(trajectory: np.ndarray, radius: int) -> np.ndarray:
-    """Applies a simple moving average filter to the trajectory."""
-    smoothed = np.copy(trajectory)
-    for i in range(trajectory.shape[1]):
-        # Create a moving average kernel
-        kernel = np.ones(2 * radius + 1) / (2 * radius + 1)
-        # Pad the edges so we don't lose data at the beginning/end of the video
-        padded = np.pad(trajectory[:, i], radius, mode="edge")
-        smoothed[:, i] = np.convolve(padded, kernel, mode="valid")
-    return smoothed
 
 
 def ecc_stabilize(input_path: str, output_path: str, output_size):
@@ -204,12 +91,125 @@ def ecc_stabilize(input_path: str, output_path: str, output_size):
     out.release()
 
 
+def ecc_stabilize_gpu(
+    input_path: str, output_path: str, output_size, device: str | None = None
+):
+    """
+    Stabilize video using Kornia's GPU-accelerated ImageRegistrator (homography).
+    Runs gradient-descent ECC on CUDA/MPS tensors via a multi-scale pyramid.
+    Falls back to CPU Kornia if no GPU is available.
+    """
+    if device is None:
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+        else:
+            device = "cpu"
+
+    cap = cv2.VideoCapture(input_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"Cannot open video: {input_path}")
+
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    W, H = output_size
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out = cv2.VideoWriter(output_path, fourcc, fps, output_size)
+
+    ret, first_frame = cap.read()
+    if not ret:
+        raise RuntimeError("Could not read the first frame.")
+
+    first_resized = cv2.resize(first_frame, output_size, interpolation=cv2.INTER_CUBIC)
+    out.write(first_resized)
+
+    def to_gray_tensor(bgr):
+        """BGR ndarray → [1, 1, H, W] float32 tensor on device."""
+        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        t = (
+            torch.from_numpy(rgb)
+            .permute(2, 0, 1)
+            .float()
+            .div(255.0)
+            .unsqueeze(0)
+            .to(device)
+        )
+        return KC.rgb_to_grayscale(t)
+
+    def to_color_tensor(bgr):
+        """BGR ndarray → [1, 3, H, W] float32 tensor on device."""
+        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        return (
+            torch.from_numpy(rgb)
+            .permute(2, 0, 1)
+            .float()
+            .div(255.0)
+            .unsqueeze(0)
+            .to(device)
+        )
+
+    def to_bgr(tensor):
+        """[1, 3, H, W] float32 tensor → BGR ndarray."""
+        np_rgb = (
+            (tensor.squeeze(0).permute(1, 2, 0).cpu().numpy() * 255)
+            .clip(0, 255)
+            .astype(np.uint8)
+        )
+        return cv2.cvtColor(np_rgb, cv2.COLOR_RGB2BGR)
+
+    target_gray = to_gray_tensor(first_resized)
+
+    # ImageRegistrator wraps gradient-descent ECC over a Gaussian image pyramid.
+    # model_type='homography' matches the OpenCV MOTION_HOMOGRAPHY mode.
+    # The model is persistent — its parameters carry over between register() calls,
+    # providing a warm start: each frame begins from the previous frame's solution.
+    registrator = KG.ImageRegistrator(
+        model_type="homography",
+        optimizer=torch.optim.Adam,
+        pyramid_levels=5,
+        lr=1e-3,
+        num_iterations=200,
+        tolerance=1e-5,
+    ).to(device)
+
+    frame_idx = 1
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        curr_resized = cv2.resize(frame, output_size, interpolation=cv2.INTER_CUBIC)
+        curr_gray = to_gray_tensor(curr_resized)
+        curr_tensor = to_color_tensor(curr_resized)
+
+        try:
+            # register(src, dst) finds H s.t. warp(src, H) ≈ dst.
+            # warp_src_into_dst then applies that H to the color frame.
+            registrator.register(curr_gray, target_gray)
+            stabilized_tensor = registrator.warp_src_into_dst(curr_tensor)
+            out.write(to_bgr(stabilized_tensor))
+        except Exception as e:
+            logger.warning(
+                f"Frame {frame_idx}: GPU ECC failed ({e}). Using unmodified frame."
+            )
+            out.write(curr_resized)
+
+        frame_idx += 1
+        if frame_idx % 10 == 0:
+            logger.info(f"ECC GPU: Stabilized {frame_idx}/{total_frames} frames")
+
+    cap.release()
+    out.release()
+
+
 def stabilize_video(input_path: str, output_path: str, method: str, output_size):
     match method:
         case "ecc":
             ecc_stabilize(input_path, output_path, output_size)
-        case "lk":
-            lk_stabilize(input_path, output_path, output_size)
+        case "ecc_gpu":
+            ecc_stabilize_gpu(input_path, output_path, output_size)
 
     logger.info(f"[STABILIZE] Output saved to {output_path}")
 
@@ -223,6 +223,6 @@ if __name__ == "__main__":
     stabilize_video(
         args.input_file,
         args.output_file,
-        "ecc",
+        "ecc_gpu",
         (1920, 1080),
     )
