@@ -29,7 +29,7 @@ def format_duration(seconds: float) -> str:
     return " ".join(parts)
 
 
-def run_gipeline(
+def run_pipeline(
     input_path: str,
     output_dir: str,
     job_id: str,

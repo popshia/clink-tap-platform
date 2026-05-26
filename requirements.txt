@@ -26,6 +26,8 @@ itsdangerous==2.2.0
 jinja2==3.1.6
 joblib==1.5.3
 kiwisolver==1.5.0
+kornia==0.8.3
+kornia-rs==0.1.14
 lapx==0.9.4
 loguru==0.7.3
 markdown-it-py==4.2.0
