@@ -210,6 +210,7 @@ pyrightconfig.json
 
 uploads/
 processed/
+processing/*.mp4
 processing/models/*
 test/
 uv.lock
