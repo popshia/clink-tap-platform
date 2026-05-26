@@ -9,7 +9,7 @@ from kornia.geometry.transform import build_pyramid
 from loguru import logger
 
 
-def _ecc_loss(warped: torch.Tensor, template: torch.Tensor) -> torch.Tensor:
+def _ecc_loss(warped: torch.Tensor, template: torch.Tensor, **_) -> torch.Tensor:
     """Enhanced Correlation Coefficient loss — illumination-invariant, range [0, 2]."""
     t = template - template.mean()
     w = warped - warped.mean()
