@@ -16,91 +16,11 @@ def _ecc_loss(warped: torch.Tensor, template: torch.Tensor, **_) -> torch.Tensor
     return 1.0 - (t * w).sum() / (t.norm() * w.norm() + 1e-8)
 
 
-def ecc_stabilize(input_path: str, output_path: str, output_size):
-    """
-    Stabilize video using ECC with 'Warm Start' (persistent warp matrix)
-    and Homography mapping.
-    """
-    cap = cv2.VideoCapture(input_path)
-    if not cap.isOpened():
-        raise RuntimeError(f"Cannot open video: {input_path}")
-
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter(output_path, fourcc, fps, output_size)
-
-    # 1. Initialize Target Template
-    ret, first_frame = cap.read()
-    if not ret:
-        raise RuntimeError("Could not read the first frame.")
-
-    # Resize and Grayscale for the ECC algorithm
-    first_resized = cv2.resize(first_frame, output_size, interpolation=cv2.INTER_CUBIC)
-    target_gray = cv2.cvtColor(first_resized, cv2.COLOR_BGR2GRAY)
-
-    # Write the first frame as-is
-    out.write(first_resized)
-
-    # 2. ECC Configuration
-    warp_mode = cv2.MOTION_HOMOGRAPHY
-    criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 300, 5 * 1e-4)
-
-    # Persistent Warp Matrix (The "Warm Start")
-    # Instead of resetting this every loop, we evolve it.
-    warp_matrix = np.eye(3, 3, dtype=np.float32)
-
-    frame_idx = 1
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        curr_resized = cv2.resize(frame, output_size, interpolation=cv2.INTER_CUBIC)
-        curr_gray = cv2.cvtColor(curr_resized, cv2.COLOR_BGR2GRAY)
-
-        try:
-            # The Warm Start: We pass the 'warp_matrix' from the PREVIOUS frame
-            # as the initial guess for the CURRENT frame.
-            _, warp_matrix = cv2.findTransformECC(
-                target_gray, curr_gray, warp_matrix, warp_mode, criteria
-            )
-
-            # Apply the calculated perspective transformation
-            # WARP_INVERSE_MAP is used because ECC calculates the mapping
-            # from template to input, but we want to pull input back to template.
-            stabilized_frame = cv2.warpPerspective(
-                curr_resized,
-                warp_matrix,
-                output_size,
-                flags=cv2.INTER_CUBIC + cv2.WARP_INVERSE_MAP,
-            )
-            out.write(stabilized_frame)
-
-        except cv2.error:
-            logger.warning(
-                f"Frame {frame_idx}: ECC failed to converge. Using previous matrix."
-            )
-            # If it fails, we apply the last successful matrix to maintain continuity
-            fallback_frame = cv2.warpPerspective(
-                curr_resized,
-                warp_matrix,
-                output_size,
-                flags=cv2.INTER_CUBIC + cv2.WARP_INVERSE_MAP,
-            )
-            out.write(fallback_frame)
-
-        frame_idx += 1
-        if frame_idx % 10 == 0:
-            logger.info(f"ECC: Stabilized {frame_idx}/{total_frames} frames")
-
-    cap.release()
-    out.release()
-
-
-def ecc_stabilize_gpu(
-    input_path: str, output_path: str, output_size, device: str | None = None
+def stabilize_video(
+    input_path: str,
+    output_path: str,
+    output_size,
+    reg_scale: float = 1.0,
 ):
     """
     Stabilize video using Kornia's GPU-accelerated ImageRegistrator (homography).
@@ -120,6 +40,7 @@ def ecc_stabilize_gpu(
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     W, H = output_size
+    reg_size = (max(1, int(W * reg_scale)), max(1, int(H * reg_scale)))
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter(output_path, fourcc, fps, output_size)
@@ -132,8 +53,9 @@ def ecc_stabilize_gpu(
     out.write(first_resized)
 
     def to_gray_tensor(bgr):
-        """BGR ndarray → [1, 1, H, W] float32 tensor on device."""
-        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        """BGR ndarray → [1, 1, reg_H, reg_W] float32 tensor on device."""
+        small = cv2.resize(bgr, reg_size, interpolation=cv2.INTER_LINEAR)
+        rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
         t = (
             torch.from_numpy(rgb)
             .permute(2, 0, 1)
@@ -172,7 +94,7 @@ def ecc_stabilize_gpu(
     # vs 30+ for Adam, matching the speed of Gauss-Newton in OpenCV's ECC.
     # Model parameters persist across frames for a warm start; LBFGS optimizer is
     # recreated per pyramid level to avoid stale curvature history across scales.
-    pyramid_levels = 3
+    pyramid_levels = 2
 
     registrator = KG.ImageRegistrator(
         model_type="homography",
@@ -202,14 +124,18 @@ def ecc_stabilize_gpu(
                 opt = torch.optim.LBFGS(
                     registrator.model.parameters(),
                     lr=0.1,
-                    max_iter=10,
+                    max_iter=5,
                     line_search_fn="strong_wolfe",
                 )
 
                 def closure(sl=src_level, dl=dst_level):
                     opt.zero_grad()
-                    loss = registrator.get_single_level_loss(sl, dl, registrator.model())
-                    loss += registrator.get_single_level_loss(dl, sl, registrator.model.forward_inverse())
+                    loss = registrator.get_single_level_loss(
+                        sl, dl, registrator.model()
+                    )
+                    loss += registrator.get_single_level_loss(
+                        dl, sl, registrator.model.forward_inverse()
+                    )
                     loss.backward()
                     return loss
 
@@ -229,15 +155,6 @@ def ecc_stabilize_gpu(
 
     cap.release()
     out.release()
-
-
-def stabilize_video(input_path: str, output_path: str, method: str, output_size):
-    match method:
-        case "ecc":
-            ecc_stabilize(input_path, output_path, output_size)
-        case "ecc_gpu":
-            ecc_stabilize_gpu(input_path, output_path, output_size)
-
     logger.info(f"[STABILIZE] Output saved to {output_path}")
 
 
@@ -250,6 +167,6 @@ if __name__ == "__main__":
     stabilize_video(
         args.input_file,
         args.output_file,
-        "ecc_gpu",
         (1920, 1080),
+        0.5,
     )

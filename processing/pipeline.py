@@ -62,7 +62,7 @@ def run_pipeline(
         output_dir, f"{input_path.split('/')[-1].split('.')[0]}_stabilized{ext}"
     )
     log("stabilizing", 0)
-    stabilize_video(input_path, stabilized_path, "ecc", (1920, 1080))  # lk, ecc
+    stabilize_video(input_path, stabilized_path, (1920, 1080), 0.5)
     log("stabilizing", 100)
 
     # ── Stage 2: Object Detect & Tracking ──
