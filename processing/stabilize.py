@@ -151,7 +151,7 @@ def ecc_stabilize_gpu(
     def to_bgr(tensor):
         """[1, 3, H, W] float32 tensor → BGR ndarray."""
         np_rgb = (
-            (tensor.squeeze(0).permute(1, 2, 0).cpu().numpy() * 255)
+            (tensor.detach().squeeze(0).permute(1, 2, 0).cpu().numpy() * 255)
             .clip(0, 255)
             .astype(np.uint8)
         )
