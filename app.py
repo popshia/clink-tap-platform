@@ -11,7 +11,7 @@ from flask_cors import CORS
 
 import config
 from processing.pipeline import run_pipeline
-from services.email_service import send_result_email
+from services.email_service import send_contact_email, send_result_email
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -169,6 +169,28 @@ def upload_chunk():
     }
     job_queue.put(job_id)
     return jsonify({"job_id": job_id, "done": True}), 202
+
+
+@app.route("/api/contact", methods=["POST"])
+def contact():
+    """Receive a 'Contact Us' submission and forward it to the support inbox."""
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    subject = (data.get("subject") or "").strip()
+    message = (data.get("message") or "").strip()
+
+    if not name or not email or not message:
+        return jsonify({"error": "Name, email and message are required"}), 400
+
+    try:
+        send_contact_email(name, email, phone, subject, message)
+    except Exception as exc:
+        print(f"Error sending contact email: {exc}")
+        return jsonify({"error": "Failed to send your message"}), 500
+
+    return jsonify({"ok": True}), 200
 
 
 @app.route("/api/status/<job_id>")

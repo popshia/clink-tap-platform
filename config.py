@@ -20,5 +20,8 @@ SMTP_PORT = 587
 SMTP_USER = os.environ.get("SMTP_USER", "")  # your-email@gmail.com
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")  # Gmail App Password
 
+# Inbox that receives "Contact Us" submissions (defaults to the SMTP account).
+CONTACT_RECIPIENT = os.environ.get("CONTACT_RECIPIENT", "") or SMTP_USER
+
 # --- Allowed extensions ---
 ALLOWED_EXTENSIONS = {"mp4", "avi", "mov", "mkv", "webm"}

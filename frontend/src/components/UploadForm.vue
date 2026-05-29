@@ -9,12 +9,14 @@
             class="drop-zone"
             :class="{
                 'drop-zone--active': isDragging,
-                'drop-zone--has-file': selectedFile,
+                'drop-zone--has-file':
+                    selectedFile && uploadState !== 'uploading',
+                'drop-zone--uploading': uploadState === 'uploading',
             }"
-            @dragover.prevent="isDragging = true"
+            @dragover.prevent="uploadState !== 'uploading' && (isDragging = true)"
             @dragleave.prevent="isDragging = false"
             @drop.prevent="onDrop"
-            @click="$refs.fileInput.click()"
+            @click="onZoneClick"
         >
             <input
                 ref="fileInput"
@@ -24,7 +26,33 @@
                 @change="onFileSelect"
             />
 
-            <div v-if="!selectedFile" class="drop-zone__placeholder">
+            <!-- Uploading: cloud icon + progress bar -->
+            <div
+                v-if="uploadState === 'uploading'"
+                class="drop-zone__uploading"
+            >
+                <div class="upload-cloud">
+                    <img
+                        src="../assets/cloud-upload.svg"
+                        style="width: 48px; height: 48px"
+                        alt="Uploading"
+                    />
+                </div>
+                <div
+                    class="upload-progress-track"
+                    role="progressbar"
+                    :aria-valuenow="uploadProgress"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                >
+                    <div
+                        class="upload-progress-fill"
+                        :style="{ width: uploadProgress + '%' }"
+                    ></div>
+                </div>
+            </div>
+
+            <div v-else-if="!selectedFile" class="drop-zone__placeholder">
                 <div class="drop-zone__icon">
                     <img
                         src="../assets/file-up.svg"
@@ -36,7 +64,7 @@
                     Drag &amp; drop your video, or click to browse.
                 </p>
                 <ol class="drop-zone__rules">
-                    <li>Video must be under 5 mins.</li>
+                    <li>File size should be smaller than 10GB.</li>
                     <li>Valid file formats: .mp4, .mkv.</li>
                 </ol>
             </div>
@@ -81,11 +109,10 @@
 
         <button
             v-else-if="uploadState === 'uploading'"
-            class="btn btn-submit btn-uploading"
-            :style="{ '--progress': uploadProgress + '%' }"
+            class="btn btn-primary btn-submit"
             disabled
         >
-            Uploading {{ uploadProgress }}%
+            Uploading Video
         </button>
 
         <button
@@ -129,8 +156,13 @@ export default {
         },
     },
     methods: {
+        onZoneClick() {
+            if (this.uploadState === "uploading") return;
+            this.$refs.fileInput.click();
+        },
         onDrop(e) {
             this.isDragging = false;
+            if (this.uploadState === "uploading") return;
             const file = e.dataTransfer.files[0];
             if (file && file.type.startsWith("video/")) {
                 this.selectedFile = file;
@@ -252,6 +284,11 @@ export default {
         background 0.2s;
     margin-bottom: 20px;
     background: transparent;
+    /* Keep the box the same height before and while uploading */
+    min-height: 210px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .drop-zone:hover,
@@ -264,6 +301,43 @@ export default {
     border-style: solid;
     border-color: var(--accent);
     padding: 16px 20px;
+    /* Compact preview row — opt out of the upload-state min-height */
+    min-height: 0;
+}
+
+/* Uploading state — no longer a click/drop target */
+.drop-zone--uploading,
+.drop-zone--uploading:hover {
+    border-color: #c5cdd5;
+    background: transparent;
+    cursor: default;
+}
+
+.drop-zone__uploading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+}
+
+.upload-cloud {
+    display: flex;
+    justify-content: center;
+}
+
+.upload-progress-track {
+    width: 72%;
+    height: 8px;
+    border-radius: 999px;
+    background: #868d94;
+    overflow: hidden;
+}
+
+.upload-progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: #b9c1c8;
+    transition: width 0.25s ease;
 }
 
 .drop-zone__icon {
@@ -292,6 +366,7 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
 }
 
 .file-badge {
@@ -299,13 +374,21 @@ export default {
     align-items: center;
     gap: 8px;
     color: var(--accent);
+    flex: 1;
+    min-width: 0;
+}
+
+.file-badge img {
+    flex-shrink: 0;
 }
 
 .file-name {
     color: var(--text-primary);
     font-weight: 500;
     font-size: 14px;
-    max-width: 240px;
+    flex: 1;
+    min-width: 0;
+    text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -314,6 +397,8 @@ export default {
 .file-size {
     color: var(--text-muted);
     font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .remove-btn {
@@ -324,6 +409,7 @@ export default {
     font-size: 13px;
     width: 28px;
     height: 28px;
+    flex-shrink: 0;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -359,27 +445,6 @@ export default {
     font-size: 16px;
     border-radius: var(--radius-md);
     letter-spacing: 0.2px;
-}
-
-.btn-uploading {
-    background: var(--accent-light);
-    color: var(--text-primary);
-    border: 1.5px solid var(--accent);
-    position: relative;
-    overflow: hidden;
-    cursor: default;
-}
-
-.btn-uploading::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: var(--progress, 0%);
-    background: var(--accent);
-    opacity: 0.35;
-    transition: width 0.25s ease;
 }
 
 .btn-failed {

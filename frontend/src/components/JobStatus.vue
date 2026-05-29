@@ -257,7 +257,7 @@ export default {
 }
 
 .status--processing {
-    background: rgba(107, 143, 163, 0.12);
+    background: rgba(126, 153, 163, 0.12);
     color: var(--accent);
 }
 
@@ -274,7 +274,7 @@ export default {
 .processing-spinner {
     width: 26px;
     height: 26px;
-    border: 3px solid rgba(107, 143, 163, 0.25);
+    border: 3px solid rgba(126, 153, 163, 0.25);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
@@ -330,7 +330,7 @@ export default {
 
 .pipeline-step--active .step-dot {
     border-color: var(--accent);
-    background: rgba(107, 143, 163, 0.1);
+    background: rgba(126, 153, 163, 0.1);
     color: var(--accent);
 }
 
@@ -343,7 +343,7 @@ export default {
 .step-spinner {
     width: 12px;
     height: 12px;
-    border: 2px solid rgba(107, 143, 163, 0.3);
+    border: 2px solid rgba(126, 153, 163, 0.3);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
