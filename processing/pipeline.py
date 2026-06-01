@@ -10,7 +10,7 @@ from loguru import logger
 
 import config
 from processing.csv_postprocess import process_trajectory_file
-from processing.detect_obb_only import run_detection_to_file
+from processing.detect_obb_only import export_detection_as_json
 from processing.stabilize import stabilize_video
 from processing.tracking_only import track_from_detections
 
@@ -74,48 +74,36 @@ def run_pipeline(
     )
     log("stabilizing", 100)
 
-    base = input_path.split("/")[-1].split(".")[0]
-    tracked_path = os.path.join(output_dir, f"{base}_tracked{ext}")
-    raw_csv = os.path.join(output_dir, "raw.csv")
-    detections_path = os.path.join(output_dir, "detections.jsonl")
-
-    # ── Stage 2 (legacy): Object Detect & Tracking ──
-    # log("tracking", 0)
-    # track_and_output_csv(
-    #     stabilized_path,
-    #     tracked_path,
-    #     config.MODEL_PATH,
-    #     raw_csv,
-    #     on_progress=lambda pct: log("tracking", pct),
-    # )
-    # log("tracking", 100)
-
     # ── Stage 2: OBB Detection ──
-    log("detect_obb_only", 0)
-    run_detection_to_file(
+    detections_path = os.path.join(output_dir, "detections.jsonl")
+    log("detecting", 0)
+    export_detection_as_json(
         stabilized_path,
         config.MODEL_PATH,
         detections_path,
-        on_progress=lambda pct: log("detect_obb_only", pct),
+        on_progress=lambda pct: log("detecting", pct),
     )
-    log("detect_obb_only", 100)
+    log("detecting", 100)
 
     # ── Stage 3: Tracking ──
-    log("tracking_only", 0)
+    base = input_path.split("/")[-1].split(".")[0]
+    tracked_path = os.path.join(output_dir, f"{base}_tracked{ext}")
+    raw_csv = os.path.join(output_dir, "raw.csv")
+    log("tracking", 0)
     track_from_detections(
         stabilized_path,
         detections_path,
         tracked_path,
         raw_csv,
-        on_progress=lambda pct: log("tracking_only", pct),
+        on_progress=lambda pct: log("tracking", pct),
     )
-    log("tracking_only", 100)
+    log("tracking", 100)
 
     # ── Stage 4: CSV file fixing ──
     processed_csv = os.path.join(output_dir, "processed.csv")
-    log("csv_postprocess", 0)
+    log("csv_postprocessing", 0)
     process_trajectory_file(raw_csv, processed_csv)
-    log("csv_postprocess", 100)
+    log("csv_postprocessing", 100)
 
     elapsed = time.perf_counter() - start
     logger.info(f"Processing time: {format_duration(elapsed)}")

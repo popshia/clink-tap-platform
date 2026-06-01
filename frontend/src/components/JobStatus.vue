@@ -2,7 +2,11 @@
     <div class="job-status card fade-in-up">
         <!-- Header -->
         <div class="status-header">
-            <div class="status-icon-wrapper" :class="statusClass">
+            <div
+                v-if="status === 'done' || status === 'error'"
+                class="status-icon-wrapper"
+                :class="statusClass"
+            >
                 <svg
                     v-if="status === 'done'"
                     width="28"
@@ -32,7 +36,6 @@
                         stroke-linecap="round"
                     />
                 </svg>
-                <span v-else class="processing-spinner"></span>
             </div>
             <h2 class="status-title">{{ statusTitle }}</h2>
             <p class="status-subtitle">{{ statusSubtitle }}</p>
@@ -117,8 +120,9 @@
 const STAGES = [
     "queued",
     "stabilizing",
+    "detecting",
     "tracking",
-    "csv_postprocess",
+    "csv_postprocessing",
     "emailing",
     "done",
 ];
@@ -138,8 +142,9 @@ export default {
             pollTimer: null,
             steps: [
                 { id: "stabilizing", label: "Image Stabilization" },
+                { id: "detecting", label: "Object Detection" },
                 { id: "tracking", label: "Object Tracking" },
-                { id: "csv_postprocess", label: "CSV Postprocessing" },
+                { id: "csv_postprocessing", label: "CSV Postprocessing" },
                 { id: "emailing", label: "Sending Email" },
             ],
         };
@@ -153,15 +158,23 @@ export default {
         statusTitle() {
             if (this.status === "done") return "Processing Complete!";
             if (this.status === "error") return "Processing Failed";
-            return "Processing Your Video…";
+            return "Processing Your Video";
         },
         statusSubtitle() {
             if (this.status === "done")
-                return "Your video has been processed and the link emailed.";
+                return "Your video has been fully processed and results have been emailed.";
             if (this.status === "error")
-                return "Something went wrong during processing.";
-            const currentStep = this.steps.find((s) => s.id === this.stage);
-            return currentStep ? currentStep.label : "Waiting in queue…";
+                return "An error occurred and processing could not be completed.";
+            const descriptions = {
+                queued: "Your job is in the queue and will begin shortly...",
+                stabilizing: "Smoothing out camera shake and motion artifacts...",
+                detecting: "Identifying and locating objects in each frame...",
+                tracking: "Following detected objects across frames over time...",
+                csv_postprocessing:
+                    "Compiling detection data into structured CSV results...",
+                emailing: "Packaging results and sending them to your inbox...",
+            };
+            return descriptions[this.stage] ?? "Waiting in queue…";
         },
         downloadZipUrl() {
             return `/api/download/${this.jobId}/zip`;
@@ -179,9 +192,7 @@ export default {
     methods: {
         stepLabel(step) {
             const showProgress =
-                this.isStepActive(step.id) &&
-                (step.id === "stabilizing" || step.id === "tracking") &&
-                this.progress > 0;
+                this.isStepActive(step.id) && this.progress > 0;
             return showProgress
                 ? `${step.label} · ${this.progress}%`
                 : step.label;
@@ -269,15 +280,6 @@ export default {
 .status--error {
     background: var(--error-light);
     color: var(--error);
-}
-
-.processing-spinner {
-    width: 26px;
-    height: 26px;
-    border: 3px solid rgba(126, 153, 163, 0.25);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
 }
 
 .status-title {

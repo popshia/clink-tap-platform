@@ -33,7 +33,15 @@ job_queue = queue.Queue()
 pending_uploads: dict = {}
 _pending_lock = threading.Lock()
 
-STAGES = ["queued", "stabilizing", "tracking", "csv_postprocess", "emailing", "done"]
+STAGES = [
+    "queued",
+    "stabilizing",
+    "detecting",
+    "tracking",
+    "csv_postprocessing",
+    "emailing",
+    "done",
+]
 
 
 def allowed_file(filename: str) -> bool:
