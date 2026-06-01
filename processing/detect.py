@@ -9,7 +9,12 @@ import cv2
 from ultralytics import YOLO
 
 
-def detect_objects(input_path: str, output_path: str, model_name: str = 'yolov8n.pt', conf: float = 0.35):
+def detect_objects(
+    input_path: str,
+    output_path: str,
+    model_name: str = "yolov8n.pt",
+    conf: float = 0.35,
+):
     """
     Run object detection on a video and write annotated output.
 
@@ -29,7 +34,7 @@ def detect_objects(input_path: str, output_path: str, model_name: str = 'yolov8n
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
 
     frame_idx = 0

@@ -6,9 +6,9 @@ import os
 import time
 from typing import Callable, Optional
 
+import config
 from loguru import logger
 
-import config
 from processing.csv_postprocess import process_trajectory_file
 from processing.stabilize import stabilize_video
 from processing.track import track_and_output_csv
