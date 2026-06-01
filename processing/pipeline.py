@@ -78,6 +78,7 @@ def run_pipeline(
     tracked_path = os.path.join(output_dir, f"{base}_tracked{ext}")
     raw_csv = os.path.join(output_dir, "raw.csv")
     detections_path = os.path.join(output_dir, "detections.jsonl")
+    background_path = os.path.join(output_dir, "background.png")
 
     # ── Stage 2 (legacy): Object Detect & Tracking ──
     # log("tracking", 0)
@@ -96,6 +97,7 @@ def run_pipeline(
         stabilized_path,
         config.MODEL_PATH,
         detections_path,
+        background_path,
         on_progress=lambda pct: log("detect_obb_only", pct),
     )
     log("detect_obb_only", 100)
