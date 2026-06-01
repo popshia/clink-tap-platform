@@ -6,13 +6,13 @@ import os
 import time
 from typing import Callable, Optional
 
+import config
 from loguru import logger
 
-import config
 from processing.csv_postprocess import process_trajectory_file
-from processing.detect import export_detection_as_json
+from processing.detect import detect_and_export_as_jsonl
 from processing.stabilize import stabilize_video
-from processing.tracking import track_from_detections
+from processing.tracking import track_from_detection_jsonl
 
 # from processing.track import track_and_output_csv
 
@@ -78,7 +78,7 @@ def run_pipeline(
     detections_path = os.path.join(output_dir, "detections.jsonl")
     background_path = os.path.join(output_dir, "background.png")
     log("detecting", 0)
-    export_detection_as_json(
+    detect_and_export_as_jsonl(
         stabilized_path,
         config.MODEL_PATH,
         detections_path,
@@ -92,7 +92,7 @@ def run_pipeline(
     tracked_path = os.path.join(output_dir, f"{base}_tracked{ext}")
     raw_csv = os.path.join(output_dir, "raw.csv")
     log("tracking", 0)
-    track_from_detections(
+    track_from_detection_jsonl(
         stabilized_path,
         detections_path,
         tracked_path,

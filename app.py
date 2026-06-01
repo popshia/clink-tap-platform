@@ -6,10 +6,9 @@ import threading
 import uuid
 import zipfile
 
+import config
 from flask import Flask, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
-
-import config
 from processing.pipeline import run_pipeline
 from services.email_service import send_contact_email, send_result_email
 
@@ -128,7 +127,7 @@ def upload_init():
         "email": email,
         "filename": safe_name,
         "total_chunks": total_chunks,
-        "received": 0,
+        "received_chunks": set(),
         "chunk_dir": chunk_dir,
         "output_dir": output_dir,
     }
@@ -146,14 +145,18 @@ def upload_chunk():
         return jsonify({"error": "Invalid chunk request"}), 400
 
     upload = pending_uploads[job_id]
+    if chunk_index < 0 or chunk_index >= upload["total_chunks"]:
+        return jsonify({"error": "Chunk index out of bounds"}), 400
     chunk.save(os.path.join(upload["chunk_dir"], f"{chunk_index:06d}"))
 
     with _pending_lock:
-        upload["received"] += 1
-        should_finalize = upload["received"] >= upload["total_chunks"]
-
+        upload["received_chunks"].add(chunk_index)
+        received_count = len(upload["received_chunks"])
+        should_finalize = received_count >= upload["total_chunks"]
+        if should_finalize:
+            pending_uploads.pop(job_id, None)
     if not should_finalize:
-        return jsonify({"received": upload["received"]}), 200
+        return jsonify({"received": received_count}), 200
 
     # All chunks received — concatenate into the final file and create the job.
     final_path = os.path.join(upload["output_dir"], upload["filename"])
