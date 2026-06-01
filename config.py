@@ -2,7 +2,6 @@ import os
 
 # --- Paths ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 PROCESSED_FOLDER = os.path.join(BASE_DIR, "processed")
 MODEL_PATH = os.path.join(BASE_DIR, "processing", "models", "yolov11_obb.pt")
 
@@ -20,6 +19,9 @@ SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 SMTP_USER = os.environ.get("SMTP_USER", "")  # your-email@gmail.com
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")  # Gmail App Password
+
+# Inbox that receives "Contact Us" submissions (defaults to the SMTP account).
+CONTACT_RECIPIENT = os.environ.get("CONTACT_RECIPIENT", "") or SMTP_USER
 
 # --- Allowed extensions ---
 ALLOWED_EXTENSIONS = {"mp4", "avi", "mov", "mkv", "webm"}

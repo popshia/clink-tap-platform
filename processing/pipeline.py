@@ -3,14 +3,33 @@ Processing Pipeline – orchestrates stabilization → detection → tracking.
 """
 
 import os
+import time
 from typing import Callable, Optional
 
 from loguru import logger
 
 import config
 from processing.csv_postprocess import process_trajectory_file
+from processing.detect import export_detection_as_json
 from processing.stabilize import stabilize_video
-from processing.track import track_and_output_csv
+from processing.tracking import track_from_detections
+
+# from processing.track import track_and_output_csv
+
+
+def format_duration(seconds: float) -> str:
+    seconds = int(seconds)
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    parts = []
+
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}min")
+
+    parts.append(f"{seconds}sec")
+    return " ".join(parts)
 
 
 def run_pipeline(
@@ -39,37 +58,60 @@ def run_pipeline(
 
     ext = os.path.splitext(input_path)[1] or ".mp4"
 
+    start = time.perf_counter()
+
     # ── Stage 1: Video Stabilization ──
     stabilized_path = os.path.join(
         output_dir, f"{input_path.split('/')[-1].split('.')[0]}_stabilized{ext}"
     )
     log("stabilizing", 0)
-    stabilize_video(input_path, stabilized_path, "ecc", (1920, 1080))  # lk, ecc
+    stabilize_video(
+        input_path,
+        stabilized_path,
+        (1920, 1080),
+        0.5,
+        on_progress=lambda pct: log("stabilizing", pct),
+    )
     log("stabilizing", 100)
 
-    # ── Stage 2: Object Detect & Tracking ──
-    tracked_path = os.path.join(
-        output_dir, f"{input_path.split('/')[-1].split('.')[0]}_detected{ext}"
+    # ── Stage 2: OBB Detection ──
+    detections_path = os.path.join(output_dir, "detections.jsonl")
+    background_path = os.path.join(output_dir, "background.png")
+    log("detecting", 0)
+    export_detection_as_json(
+        stabilized_path,
+        config.MODEL_PATH,
+        detections_path,
+        background_path,
+        on_progress=lambda pct: log("detecting", pct),
     )
+    log("detecting", 100)
+
+    # ── Stage 3: Tracking ──
+    base = input_path.split("/")[-1].split(".")[0]
+    tracked_path = os.path.join(output_dir, f"{base}_tracked{ext}")
     raw_csv = os.path.join(output_dir, "raw.csv")
     log("tracking", 0)
-    track_and_output_csv(
+    track_from_detections(
         stabilized_path,
+        detections_path,
         tracked_path,
-        config.MODEL_PATH,
-        os.path.join(output_dir, raw_csv),
+        raw_csv,
+        on_progress=lambda pct: log("tracking", pct),
     )
     log("tracking", 100)
 
-    # ── Stage 3: CSV file fixing ──
+    # ── Stage 4: CSV file fixing ──
     processed_csv = os.path.join(output_dir, "processed.csv")
-    log("csv_postprocess", 0)
+    log("csv_postprocessing", 0)
     process_trajectory_file(raw_csv, processed_csv)
-    log("csv_postprocess", 100)
+    log("csv_postprocessing", 100)
 
-    # Clean up intermediate files (keep only the final output)
-    # for intermediate in [stabilized_path, raw_csv]:
-    for intermediate in [stabilized_path]:
+    elapsed = time.perf_counter() - start
+    logger.info(f"Processing time: {format_duration(elapsed)}")
+
+    # Clean up input and intermediate files (keep only the final output)
+    for intermediate in [input_path, stabilized_path, detections_path, raw_csv]:
         try:
             os.remove(intermediate)
         except OSError:

@@ -1,216 +1,167 @@
 import argparse
 
 import cv2
+import kornia.color as KC
+import kornia.geometry as KG
 import numpy as np
+import torch
+from kornia.geometry.transform import build_pyramid
 from loguru import logger
 
 
-def lk_stabilize(
-    input_path: str, output_path: str, output_size, smoothing_radius: int = 30
+def _ecc_loss(warped: torch.Tensor, template: torch.Tensor, **_) -> torch.Tensor:
+    """Enhanced Correlation Coefficient loss — illumination-invariant, range [0, 2]."""
+    t = template - template.mean()
+    w = warped - warped.mean()
+    return 1.0 - (t * w).sum() / (t.norm() * w.norm() + 1e-8)
+
+
+def stabilize_video(
+    input_path: str,
+    output_path: str,
+    output_size,
+    reg_scale: float = 1.0,
+    on_progress=None,
 ):
     """
-    Stabilize a video using a 2-pass Lucas-Kanade optical flow method.
+    Stabilize video using Kornia's GPU-accelerated ImageRegistrator (homography).
+    Runs gradient-descent ECC on CUDA/MPS tensors via a multi-scale pyramid.
+    Falls back to CPU Kornia if no GPU is available.
     """
-    cap = cv2.VideoCapture(input_path)
-    if not cap.isOpened():
-        raise RuntimeError(f"Cannot open video: {input_path}")
+    device = (
+        "cuda"
+        if torch.cuda.is_available()
+        else ("mps" if torch.backends.mps.is_available() else "cpu")
+    )
 
-    n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-
-    # Setup Video Writer
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter(output_path, fourcc, fps, output_size)
-
-    # --- PASS 1: Compute frame-to-frame transforms ---
-    transforms = []
-
-    ret, prev_frame = cap.read()
-    if not ret:
-        raise RuntimeError("Cannot read the first frame")
-
-    # Resize first frame to target resolution
-    prev_frame = cv2.resize(prev_frame, output_size, interpolation=cv2.INTER_CUBIC)
-    prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
-
-    for i in range(1, n_frames):
-        ret, curr_frame = cap.read()
-        if not ret:
-            break
-
-        curr_frame = cv2.resize(curr_frame, output_size, interpolation=cv2.INTER_CUBIC)
-        curr_gray = cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
-
-        # Detect features to track
-        prev_pts = cv2.goodFeaturesToTrack(
-            prev_gray, maxCorners=200, qualityLevel=0.01, minDistance=30, blockSize=3
-        )
-
-        if prev_pts is not None and len(prev_pts) > 0:
-            curr_pts, status, _ = cv2.calcOpticalFlowPyrLK(
-                prev_gray, curr_gray, prev_pts, None
-            )
-
-            idx = np.where(status.flatten() == 1)[0]
-            prev_pts_good = prev_pts[idx]
-            curr_pts_good = curr_pts[idx]
-
-            if len(prev_pts_good) >= 3:
-                m, _ = cv2.estimateAffinePartial2D(prev_pts_good, curr_pts_good)
-                if m is not None:
-                    dx = m[0, 2]
-                    dy = m[1, 2]
-                    da = np.arctan2(m[1, 0], m[0, 0])
-                    transforms.append((dx, dy, da))
-                else:
-                    transforms.append((0, 0, 0))
-            else:
-                transforms.append((0, 0, 0))
-        else:
-            transforms.append((0, 0, 0))
-
-        prev_gray = curr_gray
-        logger.info(f"LK: Analyzing {i}/{n_frames} frames...")
-
-    # --- CALCULATE SMOOTH TRAJECTORY ---
-    transforms = np.array(transforms)
-    trajectory = np.cumsum(transforms, axis=0)
-    smoothed_trajectory = _smooth(trajectory, smoothing_radius)
-    difference = smoothed_trajectory - trajectory
-    transforms_smooth = transforms + difference
-
-    # --- PASS 2: Apply stabilized transforms ---
-    # Reset video to the beginning
-    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-
-    ret, frame = cap.read()
-    if ret:
-        frame = cv2.resize(frame, output_size, interpolation=cv2.INTER_CUBIC)
-        out.write(frame)
-
-    for i in range(len(transforms_smooth)):
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        frame = cv2.resize(frame, output_size, interpolation=cv2.INTER_CUBIC)
-
-        dx, dy, da = transforms_smooth[i]
-        m = np.array(
-            [[np.cos(da), -np.sin(da), dx], [np.sin(da), np.cos(da), dy]],
-            dtype=np.float64,
-        )
-
-        stabilized = cv2.warpAffine(frame, m, output_size, flags=cv2.INTER_CUBIC)
-        out.write(stabilized)
-        logger.info(f"LK: Rendered {i + 1}/{len(transforms_smooth)} frames...")
-
-    cap.release()
-    out.release()
-
-
-def _smooth(trajectory: np.ndarray, radius: int) -> np.ndarray:
-    """Applies a simple moving average filter to the trajectory."""
-    smoothed = np.copy(trajectory)
-    for i in range(trajectory.shape[1]):
-        # Create a moving average kernel
-        kernel = np.ones(2 * radius + 1) / (2 * radius + 1)
-        # Pad the edges so we don't lose data at the beginning/end of the video
-        padded = np.pad(trajectory[:, i], radius, mode="edge")
-        smoothed[:, i] = np.convolve(padded, kernel, mode="valid")
-    return smoothed
-
-
-def ecc_stabilize(input_path: str, output_path: str, output_size):
-    """
-    Stabilize video using ECC with 'Warm Start' (persistent warp matrix)
-    and Homography mapping.
-    """
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
         raise RuntimeError(f"Cannot open video: {input_path}")
 
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    W, H = output_size
+    reg_size = (max(1, int(W * reg_scale)), max(1, int(H * reg_scale)))
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter(output_path, fourcc, fps, output_size)
 
-    # 1. Initialize Target Template
     ret, first_frame = cap.read()
     if not ret:
         raise RuntimeError("Could not read the first frame.")
 
-    # Resize and Grayscale for the ECC algorithm
     first_resized = cv2.resize(first_frame, output_size, interpolation=cv2.INTER_CUBIC)
-    target_gray = cv2.cvtColor(first_resized, cv2.COLOR_BGR2GRAY)
-
-    # Write the first frame as-is
     out.write(first_resized)
 
-    # 2. ECC Configuration
-    warp_mode = cv2.MOTION_HOMOGRAPHY
-    criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 300, 5 * 1e-4)
+    def to_gray_tensor(bgr):
+        """BGR ndarray → [1, 1, reg_H, reg_W] float32 tensor on device."""
+        small = cv2.resize(bgr, reg_size, interpolation=cv2.INTER_LINEAR)
+        rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
+        t = (
+            torch.from_numpy(rgb)
+            .permute(2, 0, 1)
+            .float()
+            .div(255.0)
+            .unsqueeze(0)
+            .to(device)
+        )
+        return KC.rgb_to_grayscale(t)
 
-    # Persistent Warp Matrix (The "Warm Start")
-    # Instead of resetting this every loop, we evolve it.
-    warp_matrix = np.eye(3, 3, dtype=np.float32)
+    def to_color_tensor(bgr):
+        """BGR ndarray → [1, 3, H, W] float32 tensor on device."""
+        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        return (
+            torch.from_numpy(rgb)
+            .permute(2, 0, 1)
+            .float()
+            .div(255.0)
+            .unsqueeze(0)
+            .to(device)
+        )
+
+    def to_bgr(tensor):
+        """[1, 3, H, W] float32 tensor → BGR ndarray."""
+        np_rgb = (
+            (tensor.detach().squeeze(0).permute(1, 2, 0).cpu().numpy() * 255)
+            .clip(0, 255)
+            .astype(np.uint8)
+        )
+        return cv2.cvtColor(np_rgb, cv2.COLOR_RGB2BGR)
+
+    target_gray = to_gray_tensor(first_resized)
+
+    # Use ECC loss (illumination-invariant, same criterion as OpenCV findTransformECC)
+    # with LBFGS (quasi-Newton) instead of Adam — LBFGS converges in ~5-10 steps
+    # vs 30+ for Adam, matching the speed of Gauss-Newton in OpenCV's ECC.
+    # Model parameters persist across frames for a warm start; LBFGS optimizer is
+    # recreated per pyramid level to avoid stale curvature history across scales.
+    pyramid_levels = 2
+
+    registrator = KG.ImageRegistrator(
+        model_type="homography",
+        loss_fn=_ecc_loss,
+        pyramid_levels=pyramid_levels,
+    ).to(device)
+
+    # Pre-build the template pyramid once; it never changes.
+    target_pyr = build_pyramid(target_gray, pyramid_levels)[::-1]
 
     frame_idx = 1
+    last_pct = -1
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
         curr_resized = cv2.resize(frame, output_size, interpolation=cv2.INTER_CUBIC)
-        curr_gray = cv2.cvtColor(curr_resized, cv2.COLOR_BGR2GRAY)
+        curr_gray = to_gray_tensor(curr_resized)
+        curr_tensor = to_color_tensor(curr_resized)
 
         try:
-            # The Warm Start: We pass the 'warp_matrix' from the PREVIOUS frame
-            # as the initial guess for the CURRENT frame.
-            _, warp_matrix = cv2.findTransformECC(
-                target_gray, curr_gray, warp_matrix, warp_mode, criteria
-            )
+            curr_pyr = build_pyramid(curr_gray, pyramid_levels)[::-1]
 
-            # Apply the calculated perspective transformation
-            # WARP_INVERSE_MAP is used because ECC calculates the mapping
-            # from template to input, but we want to pull input back to template.
-            stabilized_frame = cv2.warpPerspective(
-                curr_resized,
-                warp_matrix,
-                output_size,
-                flags=cv2.INTER_CUBIC + cv2.WARP_INVERSE_MAP,
-            )
-            out.write(stabilized_frame)
+            for src_level, dst_level in zip(curr_pyr, target_pyr):
+                # New LBFGS per level — avoids stale curvature from previous scale.
+                # Model params (homography) carry over as the warm start.
+                opt = torch.optim.LBFGS(
+                    registrator.model.parameters(),
+                    lr=0.1,
+                    max_iter=5,
+                    line_search_fn="strong_wolfe",
+                )
 
-        except cv2.error:
+                def closure(sl=src_level, dl=dst_level):
+                    opt.zero_grad()
+                    loss = registrator.get_single_level_loss(
+                        sl, dl, registrator.model()
+                    )
+                    loss += registrator.get_single_level_loss(
+                        dl, sl, registrator.model.forward_inverse()
+                    )
+                    loss.backward()
+                    return loss
+
+                opt.step(closure)
+
+            stabilized_tensor = registrator.warp_src_into_dst(curr_tensor)
+            out.write(to_bgr(stabilized_tensor))
+        except Exception as e:
             logger.warning(
-                f"Frame {frame_idx}: ECC failed to converge. Using previous matrix."
+                f"Frame {frame_idx}: GPU ECC failed ({e}). Using unmodified frame."
             )
-            # If it fails, we apply the last successful matrix to maintain continuity
-            fallback_frame = cv2.warpPerspective(
-                curr_resized,
-                warp_matrix,
-                output_size,
-                flags=cv2.INTER_CUBIC + cv2.WARP_INVERSE_MAP,
-            )
-            out.write(fallback_frame)
+            out.write(curr_resized)
 
         frame_idx += 1
-        if frame_idx % 10 == 0:
-            logger.info(f"ECC: Stabilized {frame_idx}/{total_frames} frames")
+        if on_progress and total_frames > 0:
+            pct = min(99, int(frame_idx / total_frames * 100))
+            if pct != last_pct:
+                on_progress(pct)
+                last_pct = pct
+        if frame_idx % 100 == 0:
+            logger.info(f"ECC GPU: Stabilized {frame_idx}/{total_frames} frames")
 
     cap.release()
     out.release()
-
-
-def stabilize_video(input_path: str, output_path: str, method: str, output_size):
-    match method:
-        case "ecc":
-            ecc_stabilize(input_path, output_path, output_size)
-        case "lk":
-            lk_stabilize(input_path, output_path, output_size)
-
     logger.info(f"[STABILIZE] Output saved to {output_path}")
 
 
@@ -223,6 +174,6 @@ if __name__ == "__main__":
     stabilize_video(
         args.input_file,
         args.output_file,
-        "ecc",
         (1920, 1080),
+        0.5,
     )

@@ -210,6 +210,11 @@ pyrightconfig.json
 
 uploads/
 processed/
+processing/*.mp4
 processing/models/*
 test/
 uv.lock
+.claude/
+processing/tools/*.txt
+frontend/frontend.txt
+backend.txt

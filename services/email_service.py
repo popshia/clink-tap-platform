@@ -68,3 +68,65 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
         server.sendmail(config.SMTP_USER, to_email, msg.as_string())
 
     print(f"[EMAIL] Sent result email to {to_email}")
+
+
+def send_contact_email(name: str, email: str, phone: str, subject: str, message: str):
+    """Forward a 'Contact Us' submission to the support inbox via Gmail SMTP."""
+
+    recipient = config.CONTACT_RECIPIENT
+    if not config.SMTP_USER or not config.SMTP_PASSWORD or not recipient:
+        print(f"[CONTACT] SMTP not configured. Skipping contact email from {email}")
+        print(f"[CONTACT] {name} <{email}> ({phone}) — {subject}: {message}")
+        return
+
+    mail_subject = f"[Contact Us] {subject}" if subject else "[Contact Us] New message"
+
+    def esc(value: str) -> str:
+        return (
+            (value or "")
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+
+    html_body = f"""\
+    <html>
+    <body style="font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a1a; padding: 24px;">
+      <h2 style="color: #6b8fa3; margin-top: 0;">New Contact Us message</h2>
+      <table style="border-collapse: collapse; font-size: 14px;">
+        <tr><td style="padding: 4px 12px 4px 0; color: #555;"><b>Name</b></td><td>{esc(name)}</td></tr>
+        <tr><td style="padding: 4px 12px 4px 0; color: #555;"><b>Email</b></td><td>{esc(email)}</td></tr>
+        <tr><td style="padding: 4px 12px 4px 0; color: #555;"><b>Phone</b></td><td>{esc(phone)}</td></tr>
+        <tr><td style="padding: 4px 12px 4px 0; color: #555;"><b>Subject</b></td><td>{esc(subject)}</td></tr>
+      </table>
+      <p style="margin-top: 16px; line-height: 1.6; white-space: pre-wrap;">{esc(message)}</p>
+    </body>
+    </html>
+    """
+
+    text_body = (
+        f"New Contact Us message\n\n"
+        f"Name: {name}\n"
+        f"Email: {email}\n"
+        f"Phone: {phone}\n"
+        f"Subject: {subject}\n\n"
+        f"{message}\n"
+    )
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = mail_subject
+    msg["From"] = config.SMTP_USER
+    msg["To"] = recipient
+    if email:
+        msg["Reply-To"] = email
+    msg.attach(MIMEText(text_body, "plain"))
+    msg.attach(MIMEText(html_body, "html"))
+
+    with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+        server.sendmail(config.SMTP_USER, recipient, msg.as_string())
+
+    print(f"[CONTACT] Forwarded contact message from {email} to {recipient}")

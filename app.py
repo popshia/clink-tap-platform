@@ -1,6 +1,7 @@
 import io
 import os
 import queue
+import shutil
 import threading
 import uuid
 import zipfile
@@ -10,7 +11,7 @@ from flask_cors import CORS
 
 import config
 from processing.pipeline import run_pipeline
-from services.email_service import send_result_email
+from services.email_service import send_contact_email, send_result_email
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -20,7 +21,6 @@ app.config["MAX_CONTENT_LENGTH"] = config.MAX_CONTENT_LENGTH
 app.secret_key = config.SECRET_KEY
 CORS(app)
 
-os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(config.PROCESSED_FOLDER, exist_ok=True)
 
 # ---------------------------------------------------------------------------
@@ -29,7 +29,19 @@ os.makedirs(config.PROCESSED_FOLDER, exist_ok=True)
 jobs: dict = {}
 job_queue = queue.Queue()
 
-STAGES = ["queued", "stabilizing", "tracking", "csv_postprocess", "emailing", "done"]
+# Tracks in-progress chunked uploads before they are enqueued as jobs
+pending_uploads: dict = {}
+_pending_lock = threading.Lock()
+
+STAGES = [
+    "queued",
+    "stabilizing",
+    "detecting",
+    "tracking",
+    "csv_postprocessing",
+    "emailing",
+    "done",
+]
 
 
 def allowed_file(filename: str) -> bool:
@@ -63,10 +75,8 @@ threading.Thread(target=worker, daemon=True).start()
 def process_job(job_id: str):
     """Run the full pipeline in a background thread."""
     job = jobs[job_id]
-    input_path = os.path.join(config.UPLOAD_FOLDER, job["filename"])
-    # output_dir = config.PROCESSED_FOLDER + "/" + job_id
     output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
-    os.makedirs(output_dir, exist_ok=True)
+    input_path = os.path.join(output_dir, job["filename"])
 
     def on_progress(stage: str, progress: int = 0):
         job["stage"] = stage
@@ -93,42 +103,102 @@ def process_job(job_id: str):
 # ---------------------------------------------------------------------------
 # API routes
 # ---------------------------------------------------------------------------
-@app.route("/api/upload", methods=["POST"])
-def upload_video():
-    """Accept a video file + email and kick off processing."""
-    if "video" not in request.files:
-        return jsonify({"error": "No video file provided"}), 400
-
-    file = request.files["video"]
-    email = request.form.get("email", "").strip()
+@app.route("/api/upload/init", methods=["POST"])
+def upload_init():
+    """Allocate a job_id and chunk staging directory for a chunked upload."""
+    data = request.get_json(silent=True) or {}
+    filename = data.get("filename", "")
+    email = data.get("email", "").strip()
+    total_chunks = int(data.get("total_chunks", 1))
 
     if not email:
         return jsonify({"error": "Email address is required"}), 400
-    if file.filename == "" or not allowed_file(file.filename):
+    if not filename or not allowed_file(filename):
         return jsonify({"error": "Invalid or unsupported video file"}), 400
 
-    # Save uploaded file
     job_id = uuid.uuid4().hex[:4]
-    filename = file.filename.rsplit(".", 1)[0]
-    ext = file.filename.rsplit(".", 1)[1].lower()
-    safe_name = f"{job_id}_{filename}.{ext}"
-    file.save(os.path.join(config.UPLOAD_FOLDER, safe_name))
+    ext = filename.rsplit(".", 1)[1].lower()
+    base = filename.rsplit(".", 1)[0]
+    safe_name = f"{job_id}_{base}.{ext}"
+    output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
+    chunk_dir = os.path.join(output_dir, "_chunks")
+    os.makedirs(chunk_dir, exist_ok=True)
 
-    # Create job record
+    pending_uploads[job_id] = {
+        "email": email,
+        "filename": safe_name,
+        "total_chunks": total_chunks,
+        "received": 0,
+        "chunk_dir": chunk_dir,
+        "output_dir": output_dir,
+    }
+    return jsonify({"job_id": job_id}), 200
+
+
+@app.route("/api/upload/chunk", methods=["POST"])
+def upload_chunk():
+    """Receive one chunk and, when all chunks are in, assemble the file and queue the job."""
+    job_id = request.form.get("job_id")
+    chunk_index = request.form.get("chunk_index", type=int)
+    chunk = request.files.get("chunk")
+
+    if job_id not in pending_uploads or chunk_index is None or not chunk:
+        return jsonify({"error": "Invalid chunk request"}), 400
+
+    upload = pending_uploads[job_id]
+    chunk.save(os.path.join(upload["chunk_dir"], f"{chunk_index:06d}"))
+
+    with _pending_lock:
+        upload["received"] += 1
+        should_finalize = upload["received"] >= upload["total_chunks"]
+
+    if not should_finalize:
+        return jsonify({"received": upload["received"]}), 200
+
+    # All chunks received — concatenate into the final file and create the job.
+    final_path = os.path.join(upload["output_dir"], upload["filename"])
+    try:
+        with open(final_path, "wb") as out_f:
+            for i in range(upload["total_chunks"]):
+                with open(os.path.join(upload["chunk_dir"], f"{i:06d}"), "rb") as cf:
+                    shutil.copyfileobj(cf, out_f)
+    finally:
+        shutil.rmtree(upload["chunk_dir"], ignore_errors=True)
+        pending_uploads.pop(job_id, None)
+
     jobs[job_id] = {
         "status": "processing",
         "stage": "queued",
         "progress": 0,
         "error": None,
-        "email": email,
-        "filename": safe_name,
+        "email": upload["email"],
+        "filename": upload["filename"],
         "output_filename": None,
     }
-
-    # Add job to the queue
     job_queue.put(job_id)
+    return jsonify({"job_id": job_id, "done": True}), 202
 
-    return jsonify({"job_id": job_id}), 202
+
+@app.route("/api/contact", methods=["POST"])
+def contact():
+    """Receive a 'Contact Us' submission and forward it to the support inbox."""
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    subject = (data.get("subject") or "").strip()
+    message = (data.get("message") or "").strip()
+
+    if not name or not email or not message:
+        return jsonify({"error": "Name, email and message are required"}), 400
+
+    try:
+        send_contact_email(name, email, phone, subject, message)
+    except Exception as exc:
+        print(f"Error sending contact email: {exc}")
+        return jsonify({"error": "Failed to send your message"}), 500
+
+    return jsonify({"ok": True}), 200
 
 
 @app.route("/api/status/<job_id>")

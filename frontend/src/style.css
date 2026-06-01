@@ -20,18 +20,19 @@
   --text-muted: #817c7c;
   --text-label: #333333;
 
-  --accent: #6b8fa3;
+  --accent: #7E99A3;
   --accent-hover: #5E727A;
-  --accent-light: rgba(107, 143, 163, 0.12);
+  --accent-active: #A9B9BF;
+  --accent-light: rgba(126, 153, 163, 0.12);
 
-  --success: #6b8fa3;
+  --success: #7E99A3;
   --success-light: rgba(126, 153, 163, 0.30);
   --warning: #f59e0b;
   --error: #dc2626;
   --error-light: rgba(220, 38, 38, 0.08);
 
   --border: #d1d5db;
-  --border-focus: #6b8fa3;
+  --border-focus: #7E99A3;
 
   /* — Typography — */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -135,6 +136,10 @@ body {
   background: var(--accent-hover);
 }
 
+.btn-primary:active:not(:disabled) {
+  background: var(--accent-active);
+}
+
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -160,5 +165,5 @@ body {
 
 .input-field:focus {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(107, 143, 163, 0.15);
+  box-shadow: 0 0 0 3px rgba(126, 153, 163, 0.15);
 }
