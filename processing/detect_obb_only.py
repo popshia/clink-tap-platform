@@ -24,7 +24,10 @@ def export_detection_as_json(
     input_video_path,
     model_path,
     detections_path,
+    background_path,
     on_progress=None,
+    frame_stride=5,
+    max_frames=150,
 ):
     model = YOLO(model_path)
     device = (
@@ -37,12 +40,16 @@ def export_detection_as_json(
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     frame_index = 0
     last_pct = -1
+    bg_frames = []
 
     with open(detections_path, "w") as f:
         while cap.isOpened():
             success, frame = cap.read()
             if not success:
                 break
+
+            if len(bg_frames) < max_frames and frame_index % frame_stride == 0:
+                bg_frames.append(frame.copy())
 
             result = model.predict(frame, device=device)[0]
             dets = _result_to_dets(result)
@@ -63,12 +70,19 @@ def export_detection_as_json(
 
     cap.release()
 
+    if not bg_frames:
+        raise ValueError(f"No frames read from video: {input_video_path}")
+    background = np.median(np.stack(bg_frames, axis=0), axis=0).astype(np.uint8)
+    if not cv2.imwrite(background_path, background):
+        raise ValueError(f"Unable to write background image: {background_path}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("input_file")
     parser.add_argument("model")
     parser.add_argument("detections")
+    parser.add_argument("background")
     args = parser.parse_args()
 
-    export_detection_as_json(args.input_file, args.model, args.detections)
+    run_detection_to_file(args.input_file, args.model, args.detections, args.background)
