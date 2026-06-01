@@ -50,7 +50,9 @@ def _load_detections(detections_path):
             frame_index = int(record["frame_index"])
             if frame_index in detections:
                 raise ValueError(f"Duplicate detections for frame {frame_index}")
-            detections[frame_index] = _dets_from_json(record.get("dets", []), frame_index)
+            detections[frame_index] = _dets_from_json(
+                record.get("dets", []), frame_index
+            )
 
     return detections
 

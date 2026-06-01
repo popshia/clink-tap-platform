@@ -10,9 +10,9 @@ from loguru import logger
 
 import config
 from processing.csv_postprocess import process_trajectory_file
-from processing.detect_obb_only import export_detection_as_json
+from processing.detect import export_detection_as_json
 from processing.stabilize import stabilize_video
-from processing.tracking_only import track_from_detections
+from processing.tracking import track_from_detections
 
 # from processing.track import track_and_output_csv
 
@@ -74,32 +74,16 @@ def run_pipeline(
     )
     log("stabilizing", 100)
 
-    base = input_path.split("/")[-1].split(".")[0]
-    tracked_path = os.path.join(output_dir, f"{base}_tracked{ext}")
-    raw_csv = os.path.join(output_dir, "raw.csv")
-    detections_path = os.path.join(output_dir, "detections.jsonl")
-    background_path = os.path.join(output_dir, "background.png")
-
-    # ── Stage 2 (legacy): Object Detect & Tracking ──
-    # log("tracking", 0)
-    # track_and_output_csv(
-    #     stabilized_path,
-    #     tracked_path,
-    #     config.MODEL_PATH,
-    #     raw_csv,
-    #     on_progress=lambda pct: log("tracking", pct),
-    # )
-    # log("tracking", 100)
-
     # ── Stage 2: OBB Detection ──
     detections_path = os.path.join(output_dir, "detections.jsonl")
+    background_path = os.path.join(output_dir, "background.png")
     log("detecting", 0)
     export_detection_as_json(
         stabilized_path,
         config.MODEL_PATH,
         detections_path,
         background_path,
-        on_progress=lambda pct: log("detect_obb_only", pct),
+        on_progress=lambda pct: log("detecting", pct),
     )
     log("detecting", 100)
 
