@@ -86,6 +86,8 @@ def verify_download_token(token: str):
     except (ValueError, json.JSONDecodeError):
         return None
 
+    if not isinstance(payload, dict):
+        return None
     job_id = payload.get("j")
     if not isinstance(job_id, str):
         return None
@@ -278,7 +280,9 @@ def download_by_token(token):
     video_path = os.path.join(output_dir, job["output_filename"])
     csv_path = os.path.join(output_dir, "processed.csv")
     background_path = os.path.join(output_dir, "background.png")
-
+    if not os.path.isfile(video_path) or not os.path.isfile(csv_path):
+        return jsonify({"error": "Processed files are missing from disk"}), 404
+        
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
         zf.write(video_path, job["output_filename"])
