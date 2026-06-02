@@ -151,11 +151,14 @@ def upload_chunk():
     chunk.save(os.path.join(upload["chunk_dir"], f"{chunk_index:06d}"))
 
     with _pending_lock:
+        if job_id not in pending_uploads:
+            return jsonify({"error": "Upload already finalized or invalid"}), 400
         upload["received_chunks"].add(chunk_index)
         received_count = len(upload["received_chunks"])
         should_finalize = received_count >= upload["total_chunks"]
         if should_finalize:
-            pending_uploads.pop(job_id, None)
+            pending_uploads.pop(job_id)
+
     if not should_finalize:
         return jsonify({"received": received_count}), 200
 
