@@ -165,6 +165,11 @@ def process_job(job_id: str):
     except Exception as exc:
         logger.exception(f"Pipeline failed for job {job_id}")
         _update_job(job_id, status="error", error=str(exc))
+        # run_pipeline only cleans up intermediates on success, so a failure
+        # leaves the original upload plus any partial stabilized/detections/raw
+        # artifacts on disk — easily multi-GB per failed job. The traceback is
+        # already in the logs, so we can safely drop the whole output_dir.
+        shutil.rmtree(output_dir, ignore_errors=True)
         return
 
     # Pipeline succeeded. Publish the download token before attempting email so
@@ -205,13 +210,17 @@ def upload_init():
         return jsonify({"error": "Invalid or unsupported video file"}), 400
 
     # 12 hex chars (~2^48 IDs) makes collisions astronomically unlikely; the
-    # exist_ok=False makedirs + retry below makes a collision a loud failure
-    # rather than silent data corruption between two uploads.
+    # exist_ok=False makedirs on output_dir + retry below makes a collision a
+    # loud failure rather than silent data corruption between two uploads.
+    # Creating output_dir (not just chunk_dir) is what guarantees uniqueness:
+    # after finalize we rmtree the _chunks subdir but leave the processed files
+    # in output_dir, so an existing output_dir is the real collision signal.
     for _ in range(10):
         job_id = uuid.uuid4().hex[:12]
         output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
         chunk_dir = os.path.join(output_dir, "_chunks")
         try:
+            os.makedirs(output_dir, exist_ok=False)
             os.makedirs(chunk_dir, exist_ok=False)
             break
         except FileExistsError:
