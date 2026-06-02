@@ -5,23 +5,6 @@ import json
 import cv2
 import numpy as np
 from boxmot.trackers import OcSort
-from boxmot.utils.iou import AssociationFunction, iou_obb_pair
-
-
-def _patched_iou_batch_obb(bboxes1, bboxes2):
-    N, M = len(bboxes1), len(bboxes2)
-    if N == 0 or M == 0:
-        return np.zeros((N, M))
-
-    def wrapper(i, j):
-        return iou_obb_pair(i, j, bboxes1, bboxes2)
-
-    return np.fromfunction(
-        np.vectorize(wrapper, otypes=[float]), shape=(N, M), dtype=int
-    )
-
-
-AssociationFunction.iou_batch_obb = staticmethod(_patched_iou_batch_obb)
 
 
 def _dets_from_json(value, frame_index):
