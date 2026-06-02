@@ -27,7 +27,9 @@ Example: `feat/export-geojson`, `fix/tracker-id-swap`
 
 ## Code Style
 
-- Python: formatted and linted with [Ruff](https://docs.astral.sh/ruff/) (`ruff check . --fix`)
+- Python: formatted and linted with [Ruff](https://docs.astral.sh/ruff/) — run both before committing:
+  - `ruff format .` — formats code
+  - `ruff check . --fix` — lints and applies auto-fixes
 - JavaScript/Vue: no enforced formatter yet — match the style of surrounding code
 - No comments unless the *why* is non-obvious
 
