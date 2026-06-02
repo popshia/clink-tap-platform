@@ -1,4 +1,8 @@
+import base64
+import hashlib
+import hmac
 import io
+import json
 import os
 import queue
 import shutil
@@ -51,6 +55,45 @@ def allowed_file(filename: str) -> bool:
     )
 
 
+def make_download_token(job_id: str) -> str:
+    payload = json.dumps({"j": job_id}, separators=(",", ":"))
+    payload_b64 = base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    signature = hmac.new(
+        config.SECRET_KEY.encode(),
+        payload_b64.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"{payload_b64}.{signature}"
+
+
+def verify_download_token(token: str):
+    try:
+        payload_b64, signature = token.rsplit(".", 1)
+    except ValueError:
+        return None
+
+    expected_signature = hmac.new(
+        config.SECRET_KEY.encode(),
+        payload_b64.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, expected_signature):
+        return None
+
+    try:
+        padding = "=" * (-len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64 + padding))
+    except (ValueError, json.JSONDecodeError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    job_id = payload.get("j")
+    if not isinstance(job_id, str):
+        return None
+    return job_id
+
+
 # ---------------------------------------------------------------------------
 # Background worker queue
 # ---------------------------------------------------------------------------
@@ -87,7 +130,8 @@ def process_job(job_id: str):
 
         # Send email
         on_progress("emailing", 0)
-        download_url = f"{config.SERVER_URL}/api/download/{job_id}/zip"
+        job["download_token"] = make_download_token(job_id)
+        download_url = f"{config.SERVER_URL}/api/dl/{job['download_token']}"
         send_result_email(job["email"], download_url, job_id)
 
         job["status"] = "done"
@@ -214,52 +258,25 @@ def job_status(job_id):
     job = jobs.get(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
-    return jsonify(
-        {
-            "job_id": job_id,
-            "status": job["status"],
-            "stage": job["stage"],
-            "progress": job["progress"],
-            "error": job["error"],
-        }
-    )
+    resp = {
+        "job_id": job_id,
+        "status": job["status"],
+        "stage": job["stage"],
+        "progress": job["progress"],
+        "error": job["error"],
+    }
+    if job["status"] == "done" and job.get("download_token"):
+        resp["download_token"] = job["download_token"]
+    return jsonify(resp)
 
 
-@app.route("/api/download/<job_id>")
-def download_video(job_id):
-    """Serve the processed video file."""
-    job = jobs.get(job_id)
-    if not job:
-        return jsonify({"error": "Job not found"}), 404
-    if job["status"] != "done" or not job["output_filename"]:
-        return jsonify({"error": "Video not ready yet"}), 400
-    output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
-    return send_from_directory(
-        output_dir,
-        job["output_filename"],
-        as_attachment=True,
-    )
+@app.route("/api/dl/<token>")
+def download_by_token(token):
+    """Stream a ZIP (video, CSV, background) via HMAC-signed token."""
+    job_id = verify_download_token(token)
+    if not job_id:
+        return jsonify({"error": "Invalid download link"}), 403
 
-
-@app.route("/api/download/<job_id>/csv")
-def download_csv(job_id):
-    """Serve the processed CSV file."""
-    job = jobs.get(job_id)
-    if not job:
-        return jsonify({"error": "Job not found"}), 404
-    if job["status"] != "done":
-        return jsonify({"error": "CSV not ready yet"}), 400
-    output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
-    return send_from_directory(
-        output_dir,
-        "processed.csv",
-        as_attachment=True,
-    )
-
-
-@app.route("/api/download/<job_id>/zip")
-def download_zip(job_id):
-    """Stream a ZIP containing the processed video and CSV."""
     job = jobs.get(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
@@ -269,11 +286,16 @@ def download_zip(job_id):
     output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
     video_path = os.path.join(output_dir, job["output_filename"])
     csv_path = os.path.join(output_dir, "processed.csv")
-
+    background_path = os.path.join(output_dir, "background.png")
+    if not os.path.isfile(video_path) or not os.path.isfile(csv_path):
+        return jsonify({"error": "Processed files are missing from disk"}), 404
+        
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
         zf.write(video_path, job["output_filename"])
         zf.write(csv_path, "processed.csv")
+        if os.path.isfile(background_path):
+            zf.write(background_path, "background.png")
     buf.seek(0)
 
     return send_file(

@@ -139,6 +139,7 @@ export default {
             stage: "queued",
             progress: 0,
             error: null,
+            downloadToken: null,
             pollTimer: null,
             steps: [
                 { id: "stabilizing", label: "Image Stabilization" },
@@ -177,7 +178,7 @@ export default {
             return descriptions[this.stage] ?? "Waiting in queue…";
         },
         downloadZipUrl() {
-            return `/api/download/${this.jobId}/zip`;
+            return this.downloadToken ? `/api/dl/${this.downloadToken}` : "#";
         },
         currentStageIndex() {
             return STAGES.indexOf(this.stage);
@@ -232,6 +233,7 @@ export default {
                 this.stage = data.stage;
                 this.progress = data.progress;
                 this.error = data.error;
+                if (data.download_token) this.downloadToken = data.download_token;
 
                 if (data.status === "done" || data.status === "error") {
                     this.stopPolling();
