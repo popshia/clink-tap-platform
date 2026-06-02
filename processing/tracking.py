@@ -4,7 +4,7 @@ import json
 
 import cv2
 import numpy as np
-from boxmot.trackers.ocsort.ocsort import OcSort
+from boxmot.trackers import OcSort
 from boxmot.utils.iou import AssociationFunction, iou_obb_pair
 
 

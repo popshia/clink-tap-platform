@@ -1,17 +1,19 @@
 import base64
 import hashlib
 import hmac
-import io
 import json
 import os
 import queue
 import shutil
+import tempfile
 import threading
+import time
 import uuid
 import zipfile
 
 from flask import Flask, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
+from loguru import logger
 
 import config
 from processing.pipeline import run_pipeline
@@ -31,11 +33,33 @@ os.makedirs(config.PROCESSED_FOLDER, exist_ok=True)
 # In-memory job store & Queue
 # ---------------------------------------------------------------------------
 jobs: dict = {}
+_jobs_lock = threading.Lock()
 job_queue = queue.Queue()
 
 # Tracks in-progress chunked uploads before they are enqueued as jobs
 pending_uploads: dict = {}
 _pending_lock = threading.Lock()
+
+
+def _update_job(job_id: str, **fields) -> None:
+    """Atomically apply field updates to a job record.
+
+    The pipeline worker writes (stage, progress, status, ...) from a background
+    thread while Flask request threads read the same dict. Without this lock a
+    status response can return a stage from one update and a progress value from
+    the next, or download_by_token can see status="done" before output_filename
+    is set. Updates here are guaranteed to land as one atomic group.
+    """
+    with _jobs_lock:
+        if job_id in jobs:
+            jobs[job_id].update(fields)
+
+
+def _snapshot_job(job_id: str):
+    """Return a thread-safe shallow copy of a job record, or None if missing."""
+    with _jobs_lock:
+        job = jobs.get(job_id)
+        return dict(job) if job is not None else None
 
 STAGES = [
     "queued",
@@ -55,8 +79,14 @@ def allowed_file(filename: str) -> bool:
     )
 
 
+DOWNLOAD_TOKEN_TTL_SECONDS = 24 * 60 * 60
+
+
 def make_download_token(job_id: str) -> str:
-    payload = json.dumps({"j": job_id}, separators=(",", ":"))
+    payload = json.dumps(
+        {"j": job_id, "exp": int(time.time()) + DOWNLOAD_TOKEN_TTL_SECONDS},
+        separators=(",", ":"),
+    )
     payload_b64 = base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
     signature = hmac.new(
         config.SECRET_KEY.encode(),
@@ -91,6 +121,9 @@ def verify_download_token(token: str):
     job_id = payload.get("j")
     if not isinstance(job_id, str):
         return None
+    exp = payload.get("exp")
+    if not isinstance(exp, int) or exp < int(time.time()):
+        return None
     return job_id
 
 
@@ -105,8 +138,8 @@ def worker():
             break
         try:
             process_job(job_id)
-        except Exception as e:
-            print(f"Error processing job {job_id}: {e}")
+        except Exception:
+            logger.exception(f"Error processing job {job_id}")
         finally:
             job_queue.task_done()
 
@@ -117,31 +150,47 @@ threading.Thread(target=worker, daemon=True).start()
 
 def process_job(job_id: str):
     """Run the full pipeline in a background thread."""
-    job = jobs[job_id]
+    snapshot = _snapshot_job(job_id)
+    if snapshot is None:
+        logger.error(f"process_job called for unknown job {job_id}")
+        return
     output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
-    input_path = os.path.join(output_dir, job["filename"])
+    input_path = os.path.join(output_dir, snapshot["filename"])
 
     def on_progress(stage: str, progress: int = 0):
-        job["stage"] = stage
-        job["progress"] = progress
+        _update_job(job_id, stage=stage, progress=progress)
 
     try:
         output_path = run_pipeline(input_path, output_dir, job_id, on_progress)
-
-        # Send email
-        on_progress("emailing", 0)
-        job["download_token"] = make_download_token(job_id)
-        download_url = f"{config.SERVER_URL}/api/dl/{job['download_token']}"
-        send_result_email(job["email"], download_url, job_id)
-
-        job["status"] = "done"
-        job["stage"] = "done"
-        job["progress"] = 100
-        job["output_filename"] = os.path.basename(output_path)
-
     except Exception as exc:
-        job["status"] = "error"
-        job["error"] = str(exc)
+        logger.exception(f"Pipeline failed for job {job_id}")
+        _update_job(job_id, status="error", error=str(exc))
+        # run_pipeline only cleans up intermediates on success, so a failure
+        # leaves the original upload plus any partial stabilized/detections/raw
+        # artifacts on disk — easily multi-GB per failed job. The traceback is
+        # already in the logs, so we can safely drop the whole output_dir.
+        shutil.rmtree(output_dir, ignore_errors=True)
+        return
+
+    # Pipeline succeeded. Publish the download token before attempting email so
+    # the user can still retrieve their results via the status endpoint even if
+    # SMTP fails. Email errors are surfaced separately on the job record.
+    download_token = make_download_token(job_id)
+    _update_job(
+        job_id,
+        download_token=download_token,
+        output_filename=os.path.basename(output_path),
+    )
+    download_url = f"{config.SERVER_URL}/api/dl/{download_token}"
+
+    on_progress("emailing", 0)
+    try:
+        send_result_email(snapshot["email"], download_url, job_id)
+    except Exception as exc:
+        logger.exception(f"Result email failed for job {job_id}")
+        _update_job(job_id, email_error=str(exc))
+
+    _update_job(job_id, status="done", stage="done", progress=100)
 
 
 # ---------------------------------------------------------------------------
@@ -160,13 +209,28 @@ def upload_init():
     if not filename or not allowed_file(filename):
         return jsonify({"error": "Invalid or unsupported video file"}), 400
 
-    job_id = uuid.uuid4().hex[:4]
+    # 12 hex chars (~2^48 IDs) makes collisions astronomically unlikely; the
+    # exist_ok=False makedirs on output_dir + retry below makes a collision a
+    # loud failure rather than silent data corruption between two uploads.
+    # Creating output_dir (not just chunk_dir) is what guarantees uniqueness:
+    # after finalize we rmtree the _chunks subdir but leave the processed files
+    # in output_dir, so an existing output_dir is the real collision signal.
+    for _ in range(10):
+        job_id = uuid.uuid4().hex[:12]
+        output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
+        chunk_dir = os.path.join(output_dir, "_chunks")
+        try:
+            os.makedirs(output_dir, exist_ok=False)
+            os.makedirs(chunk_dir, exist_ok=False)
+            break
+        except FileExistsError:
+            continue
+    else:
+        return jsonify({"error": "Failed to allocate job ID"}), 500
+
     ext = filename.rsplit(".", 1)[1].lower()
     base = filename.rsplit(".", 1)[0]
     safe_name = f"{job_id}_{base}.{ext}"
-    output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
-    chunk_dir = os.path.join(output_dir, "_chunks")
-    os.makedirs(chunk_dir, exist_ok=True)
 
     pending_uploads[job_id] = {
         "email": email,
@@ -217,15 +281,17 @@ def upload_chunk():
     finally:
         shutil.rmtree(upload["chunk_dir"], ignore_errors=True)
 
-    jobs[job_id] = {
-        "status": "processing",
-        "stage": "queued",
-        "progress": 0,
-        "error": None,
-        "email": upload["email"],
-        "filename": upload["filename"],
-        "output_filename": None,
-    }
+    with _jobs_lock:
+        jobs[job_id] = {
+            "status": "processing",
+            "stage": "queued",
+            "progress": 0,
+            "error": None,
+            "email_error": None,
+            "email": upload["email"],
+            "filename": upload["filename"],
+            "output_filename": None,
+        }
     job_queue.put(job_id)
     return jsonify({"job_id": job_id, "done": True}), 202
 
@@ -245,8 +311,8 @@ def contact():
 
     try:
         send_contact_email(name, email, phone, subject, message)
-    except Exception as exc:
-        print(f"Error sending contact email: {exc}")
+    except Exception:
+        logger.exception("Error sending contact email")
         return jsonify({"error": "Failed to send your message"}), 500
 
     return jsonify({"ok": True}), 200
@@ -255,7 +321,7 @@ def contact():
 @app.route("/api/status/<job_id>")
 def job_status(job_id):
     """Return current processing status for a job."""
-    job = jobs.get(job_id)
+    job = _snapshot_job(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
     resp = {
@@ -264,6 +330,7 @@ def job_status(job_id):
         "stage": job["stage"],
         "progress": job["progress"],
         "error": job["error"],
+        "email_error": job.get("email_error"),
     }
     if job["status"] == "done" and job.get("download_token"):
         resp["download_token"] = job["download_token"]
@@ -277,7 +344,7 @@ def download_by_token(token):
     if not job_id:
         return jsonify({"error": "Invalid download link"}), 403
 
-    job = jobs.get(job_id)
+    job = _snapshot_job(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
     if job["status"] != "done" or not job["output_filename"]:
@@ -289,17 +356,29 @@ def download_by_token(token):
     background_path = os.path.join(output_dir, "background.png")
     if not os.path.isfile(video_path) or not os.path.isfile(csv_path):
         return jsonify({"error": "Processed files are missing from disk"}), 404
-        
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
-        zf.write(video_path, job["output_filename"])
-        zf.write(csv_path, "processed.csv")
-        if os.path.isfile(background_path):
-            zf.write(background_path, "background.png")
-    buf.seek(0)
+
+    # Build the zip on disk (videos can be multi-GB; buffering in RAM would OOM).
+    # Then open + unlink so the inode is reclaimed automatically once send_file
+    # closes the fd at the end of the response.
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".zip")
+    os.close(tmp_fd)
+    try:
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_STORED, allowZip64=True) as zf:
+            zf.write(video_path, job["output_filename"])
+            zf.write(csv_path, "processed.csv")
+            if os.path.isfile(background_path):
+                zf.write(background_path, "background.png")
+        zip_fh = open(tmp_path, "rb")
+    except Exception:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
+    os.unlink(tmp_path)
 
     return send_file(
-        buf,
+        zip_fh,
         mimetype="application/zip",
         as_attachment=True,
         download_name=f"{job_id}.zip",
