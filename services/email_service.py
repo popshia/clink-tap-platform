@@ -17,29 +17,33 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
 
     html_body = f"""\
     <html>
-    <body style="font-family: 'Segoe UI', Arial, sans-serif; background: #0f0f23; color: #e0e0e0; padding: 40px;">
-      <div style="max-width: 560px; margin: 0 auto; background: linear-gradient(135deg, #1a1a3e, #16213e); border-radius: 16px; padding: 40px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
-        <h1 style="color: #818cf8; margin-top: 0; font-size: 24px;">🎬 Video Processing Complete</h1>
-        <p style="line-height: 1.7; color: #c0c0d0;">
-          Great news! Your video has been processed through all three stages:
+    <body style="font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f8; color: #1a1a1a; padding: 40px;">
+      <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 8px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-top: 4px solid #7E99A3;">
+        <h1 style="color: #2c3e50; margin-top: 0; font-size: 22px; font-weight: 600;">Video Processing Complete</h1>
+        <p style="line-height: 1.7; color: #444;">
+          Your video has been successfully processed through all pipeline stages:
         </p>
-        <ul style="line-height: 2; color: #a0a0c0;">
-          <li>✅ Video Stabilization</li>
-          <li>✅ Object Tracking</li>
-          <li>✅ CSV Postprocessing</li>
-        </ul>
-        <p style="line-height: 1.7; color: #c0c0d0;">
-          Click the button below to download your processed video:
+        <table style="border-collapse: collapse; margin: 16px 0; font-size: 14px; color: #555;">
+          <tr><td style="padding: 6px 12px 6px 0;">Stage 1 — Video Stabilization</td><td style="color: #5a8a6a; font-weight: 600;">Completed</td></tr>
+          <tr><td style="padding: 6px 12px 6px 0;">Stage 2 — Object Detection</td><td style="color: #5a8a6a; font-weight: 600;">Completed</td></tr>
+          <tr><td style="padding: 6px 12px 6px 0;">Stage 3 — Object Tracking</td><td style="color: #5a8a6a; font-weight: 600;">Completed</td></tr>
+          <tr><td style="padding: 6px 12px 6px 0;">Stage 4 — CSV Postprocessing</td><td style="color: #5a8a6a; font-weight: 600;">Completed</td></tr>
+        </table>
+        <p style="line-height: 1.7; color: #444;">
+          Please use the button below to download your processed output, which includes the stabilized video, tracking data (CSV), and background image.
         </p>
         <div style="text-align: center; margin: 32px 0;">
           <a href="{download_url}"
-             style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 600; font-size: 16px; display: inline-block;">
-            ⬇️ Download Video
+             style="background: #7E99A3; color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 6px; font-weight: 600; font-size: 15px; display: inline-block; letter-spacing: 0.3px;">
+            Download Results
           </a>
         </div>
-        <p style="font-size: 13px; color: #666; margin-top: 32px; border-top: 1px solid #2a2a4a; padding-top: 16px;">
+        <p style="line-height: 1.7; color: #444;">
+          Thank you for using TTGUI Video Processor. We appreciate your trust in our platform and hope the results meet your expectations.
+        </p>
+        <p style="font-size: 12px; color: #999; margin-top: 32px; border-top: 1px solid #e8e8e8; padding-top: 16px;">
           Job ID: {job_id}<br>
-          This is an automated message from TTGUI Video Processor.
+          This is an automated notification from TTGUI Video Processor. Please do not reply to this message.
         </p>
       </div>
     </body>
@@ -53,9 +57,15 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
 
     # Plain-text fallback
     text_body = (
-        f"Your video (Job {job_id}) has been processed!\n\n"
-        f"Download it here: {download_url}\n\n"
-        f"Stages completed: Stabilization, Object Detection, Object Tracking."
+        f"Your video (Job {job_id}) has been successfully processed.\n\n"
+        f"Stages completed:\n"
+        f"  Stage 1 - Video Stabilization\n"
+        f"  Stage 2 - Object Detection\n"
+        f"  Stage 3 - Object Tracking\n"
+        f"  Stage 4 - CSV Postprocessing\n\n"
+        f"Download your results here: {download_url}\n\n"
+        f"Thank you for using TTGUI Video Processor. We appreciate your trust in our platform.\n\n"
+        f"This is an automated notification. Please do not reply to this message."
     )
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
