@@ -51,7 +51,7 @@ def detect_and_export_as_jsonl(
             if len(bg_frames) < max_frames and frame_index % frame_stride == 0:
                 bg_frames.append(frame.copy())
 
-            result = model.predict(frame, device=device)[0]
+            result = model.predict(frame, device=device, verbose=False)[0]
             dets = _result_to_dets(result)
             f.write(
                 json.dumps(
