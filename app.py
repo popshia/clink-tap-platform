@@ -6,9 +6,10 @@ import threading
 import uuid
 import zipfile
 
-import config
 from flask import Flask, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
+
+import config
 from processing.pipeline import run_pipeline
 from services.email_service import send_contact_email, send_result_email
 
