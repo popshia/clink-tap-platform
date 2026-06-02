@@ -141,12 +141,13 @@ def upload_chunk():
     chunk_index = request.form.get("chunk_index", type=int)
     chunk = request.files.get("chunk")
 
-    if job_id not in pending_uploads or chunk_index is None or not chunk:
-        return jsonify({"error": "Invalid chunk request"}), 400
+    upload = pending_uploads.get(job_id)
 
-    upload = pending_uploads[job_id]
+    if upload is None or chunk_index is None or not chunk:
+        return jsonify({"error": "Invalid chunk request"}), 400
     if chunk_index < 0 or chunk_index >= upload["total_chunks"]:
         return jsonify({"error": "Chunk index out of bounds"}), 400
+
     chunk.save(os.path.join(upload["chunk_dir"], f"{chunk_index:06d}"))
 
     with _pending_lock:
@@ -167,7 +168,6 @@ def upload_chunk():
                     shutil.copyfileobj(cf, out_f)
     finally:
         shutil.rmtree(upload["chunk_dir"], ignore_errors=True)
-        pending_uploads.pop(job_id, None)
 
     jobs[job_id] = {
         "status": "processing",
