@@ -182,7 +182,7 @@ export CONTACT_RECIPIENT="support@your-domain.com"  # Optional; defaults to SMTP
 3. When final chunk arrives → all chunks are assembled into a single file and enqueued
 4. Client calls `GET /api/status/<job_id>` (polling) → returns `{ status, stage, progress, error }`
 5. Background worker processes job sequentially through the pipeline
-6. When done → `POST /api/contact` or result email sent with HMAC-signed download token
+6. When done → backend calls `send_result_email()` with an HMAC-signed download token; result is stored in the job record
 
 **Key File:** `app.py` contains all routes, the in-memory job store, and the single background worker thread.
 
