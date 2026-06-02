@@ -20,7 +20,7 @@ def _result_to_dets(result):
     return np.empty((0, 7), dtype=np.float32)
 
 
-def export_detection_as_json(
+def detect_and_export_as_jsonl(
     input_video_path,
     model_path,
     detections_path,
@@ -85,6 +85,6 @@ if __name__ == "__main__":
     parser.add_argument("background")
     args = parser.parse_args()
 
-    export_detection_as_json(
+    detect_and_export_as_jsonl(
         args.input_file, args.model, args.detections, args.background
     )

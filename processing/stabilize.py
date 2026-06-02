@@ -143,7 +143,8 @@ def stabilize_video(
 
                 opt.step(closure)
 
-            stabilized_tensor = registrator.warp_src_into_dst(curr_tensor)
+            with torch.no_grad():
+                stabilized_tensor = registrator.warp_src_into_dst(curr_tensor)
             out.write(to_bgr(stabilized_tensor))
         except Exception as e:
             logger.warning(

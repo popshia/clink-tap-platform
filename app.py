@@ -128,7 +128,7 @@ def upload_init():
         "email": email,
         "filename": safe_name,
         "total_chunks": total_chunks,
-        "received": 0,
+        "received_chunks": set(),
         "chunk_dir": chunk_dir,
         "output_dir": output_dir,
     }
@@ -142,18 +142,26 @@ def upload_chunk():
     chunk_index = request.form.get("chunk_index", type=int)
     chunk = request.files.get("chunk")
 
-    if job_id not in pending_uploads or chunk_index is None or not chunk:
-        return jsonify({"error": "Invalid chunk request"}), 400
+    upload = pending_uploads.get(job_id)
 
-    upload = pending_uploads[job_id]
+    if upload is None or chunk_index is None or not chunk:
+        return jsonify({"error": "Invalid chunk request"}), 400
+    if chunk_index < 0 or chunk_index >= upload["total_chunks"]:
+        return jsonify({"error": "Chunk index out of bounds"}), 400
+
     chunk.save(os.path.join(upload["chunk_dir"], f"{chunk_index:06d}"))
 
     with _pending_lock:
-        upload["received"] += 1
-        should_finalize = upload["received"] >= upload["total_chunks"]
+        if job_id not in pending_uploads:
+            return jsonify({"error": "Upload already finalized or invalid"}), 400
+        upload["received_chunks"].add(chunk_index)
+        received_count = len(upload["received_chunks"])
+        should_finalize = received_count >= upload["total_chunks"]
+        if should_finalize:
+            pending_uploads.pop(job_id)
 
     if not should_finalize:
-        return jsonify({"received": upload["received"]}), 200
+        return jsonify({"received": received_count}), 200
 
     # All chunks received — concatenate into the final file and create the job.
     final_path = os.path.join(upload["output_dir"], upload["filename"])
@@ -164,7 +172,6 @@ def upload_chunk():
                     shutil.copyfileobj(cf, out_f)
     finally:
         shutil.rmtree(upload["chunk_dir"], ignore_errors=True)
-        pending_uploads.pop(job_id, None)
 
     jobs[job_id] = {
         "status": "processing",

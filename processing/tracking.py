@@ -8,7 +8,6 @@ from boxmot.trackers.ocsort.ocsort import OcSort
 from boxmot.utils.iou import AssociationFunction, iou_obb_pair
 
 
-@staticmethod
 def _patched_iou_batch_obb(bboxes1, bboxes2):
     N, M = len(bboxes1), len(bboxes2)
     if N == 0 or M == 0:
@@ -22,7 +21,7 @@ def _patched_iou_batch_obb(bboxes1, bboxes2):
     )
 
 
-AssociationFunction.iou_batch_obb = _patched_iou_batch_obb
+AssociationFunction.iou_batch_obb = staticmethod(_patched_iou_batch_obb)
 
 
 def _dets_from_json(value, frame_index):
@@ -57,7 +56,7 @@ def _load_detections(detections_path):
     return detections
 
 
-def track_from_detections(
+def track_from_detection_jsonl(
     input_video_path,
     detections_path,
     output_video_path,
@@ -196,4 +195,6 @@ if __name__ == "__main__":
     parser.add_argument("csv")
     args = parser.parse_args()
 
-    track_from_detections(args.input_file, args.detections, args.output_file, args.csv)
+    track_from_detection_jsonl(
+        args.input_file, args.detections, args.output_file, args.csv
+    )
