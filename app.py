@@ -298,7 +298,11 @@ def upload_chunk():
             "output_filename": None,
         }
     job_queue.put(job_id)
-    send_acknowledgment_email(upload["email"], job_id)
+    threading.Thread(
+        target=send_acknowledgment_email,
+        args=(upload["email"], job_id),
+        daemon=True,
+    ).start()
     return jsonify({"job_id": job_id, "done": True}), 202
 
 

@@ -79,14 +79,16 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
-    with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-        server.sendmail(config.SMTP_USER, to_email, msg.as_string())
-
-    print(f"[EMAIL] Sent result email to {to_email}")
+    try:
+        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+            server.sendmail(config.SMTP_USER, to_email, msg.as_string())
+        print(f"[EMAIL] Sent result email to {to_email}")
+    except Exception as exc:
+        print(f"[EMAIL] Failed to send result email to {to_email}: {exc}")
 
 
 def send_acknowledgment_email(to_email: str, job_id: str):
@@ -156,14 +158,16 @@ def send_acknowledgment_email(to_email: str, job_id: str):
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
-    with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-        server.sendmail(config.SMTP_USER, to_email, msg.as_string())
-
-    print(f"[EMAIL] Sent acknowledgment email to {to_email}")
+    try:
+        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+            server.sendmail(config.SMTP_USER, to_email, msg.as_string())
+        print(f"[EMAIL] Sent acknowledgment email to {to_email}")
+    except Exception as exc:
+        print(f"[EMAIL] Failed to send acknowledgment email to {to_email}: {exc}")
 
 
 def send_contact_email(name: str, email: str, phone: str, subject: str, message: str):
@@ -218,11 +222,13 @@ def send_contact_email(name: str, email: str, phone: str, subject: str, message:
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
-    with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-        server.sendmail(config.SMTP_USER, recipient, msg.as_string())
-
-    print(f"[CONTACT] Forwarded contact message from {email} to {recipient}")
+    try:
+        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+            server.sendmail(config.SMTP_USER, recipient, msg.as_string())
+        print(f"[CONTACT] Forwarded contact message from {email} to {recipient}")
+    except Exception as exc:
+        print(f"[CONTACT] Failed to forward contact message from {email}: {exc}")
