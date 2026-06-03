@@ -17,7 +17,11 @@ from loguru import logger
 
 import config
 from processing.pipeline import run_pipeline
-from services.email_service import send_contact_email, send_result_email
+from services.email_service import (
+    send_acknowledgment_email,
+    send_contact_email,
+    send_result_email,
+)
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -294,6 +298,7 @@ def upload_chunk():
             "output_filename": None,
         }
     job_queue.put(job_id)
+    send_acknowledgment_email(upload["email"], job_id)
     return jsonify({"job_id": job_id, "done": True}), 202
 
 

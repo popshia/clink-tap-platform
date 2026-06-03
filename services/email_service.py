@@ -13,59 +13,68 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
         print(f"[EMAIL] Download link would be: {download_url}")
         return
 
-    subject = f"Your processed video is ready! (Job {job_id})"
+    subject = f"Your Results Are Ready — Job {job_id}"
 
     html_body = f"""\
-    <html>
-    <body style="font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f8; color: #1a1a1a; padding: 40px;">
-      <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 8px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-top: 4px solid #7E99A3;">
-        <h1 style="color: #2c3e50; margin-top: 0; font-size: 22px; font-weight: 600;">Video Processing Complete</h1>
-        <p style="line-height: 1.7; color: #444;">
-          Your video has been successfully processed through all pipeline stages:
-        </p>
-        <table style="border-collapse: collapse; margin: 16px 0; font-size: 14px; color: #555;">
-          <tr><td style="padding: 6px 12px 6px 0;">Stage 1 — Video Stabilization</td><td style="color: #5a8a6a; font-weight: 600;">Completed</td></tr>
-          <tr><td style="padding: 6px 12px 6px 0;">Stage 2 — Object Detection</td><td style="color: #5a8a6a; font-weight: 600;">Completed</td></tr>
-          <tr><td style="padding: 6px 12px 6px 0;">Stage 3 — Object Tracking</td><td style="color: #5a8a6a; font-weight: 600;">Completed</td></tr>
-          <tr><td style="padding: 6px 12px 6px 0;">Stage 4 — CSV Postprocessing</td><td style="color: #5a8a6a; font-weight: 600;">Completed</td></tr>
-        </table>
-        <p style="line-height: 1.7; color: #444;">
-          Please use the button below to download your processed output, which includes the stabilized video, tracking data (CSV), and background image.
-        </p>
-        <div style="text-align: center; margin: 32px 0;">
-          <a href="{download_url}"
-             style="background: #7E99A3; color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 6px; font-weight: 600; font-size: 15px; display: inline-block; letter-spacing: 0.3px;">
-            Download Results
-          </a>
-        </div>
-        <p style="line-height: 1.7; color: #444;">
-          Thank you for using TTGUI Video Processor. We appreciate your trust in our platform and hope the results meet your expectations.
-        </p>
-        <p style="font-size: 12px; color: #999; margin-top: 32px; border-top: 1px solid #e8e8e8; padding-top: 16px;">
-          Job ID: {job_id}<br>
-          This is an automated notification from TTGUI Video Processor. Please do not reply to this message.
-        </p>
-      </div>
-    </body>
-    </html>
-    """
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e0e0e0;">
+        <tr>
+          <td style="background:#4a6572;padding:28px 40px;">
+            <span style="color:#ffffff;font-size:18px;font-weight:bold;letter-spacing:0.5px;">C-LINK TAP Platform</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:40px;">
+            <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:20px;font-weight:600;">Your results are ready for download.</h2>
+            <p style="margin:0 0 32px;color:#555555;font-size:14px;line-height:1.8;">
+              Your video has been processed successfully. The download package includes the stabilized video, vehicle tracking data (CSV), and background reference image.
+            </p>
+            <table cellpadding="0" cellspacing="0" style="margin:0 auto 32px;">
+              <tr>
+                <td style="background:#4a6572;border-radius:4px;">
+                  <a href="{download_url}" style="display:inline-block;padding:12px 36px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;letter-spacing:0.3px;">Download Results</a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0 0 24px;color:#888888;font-size:12px;line-height:1.6;">
+              If the button above does not work, copy and paste the following link into your browser:<br>
+              <a href="{download_url}" style="color:#4a6572;word-break:break-all;">{download_url}</a>
+            </p>
+            <p style="margin:0;color:#555555;font-size:14px;line-height:1.8;">
+              Thank you for using C-LINK TAP Platform. We hope the results meet your expectations.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px;border-top:1px solid #e8e8e8;background:#fafafa;">
+            <p style="margin:0;color:#aaaaaa;font-size:11px;line-height:1.6;">
+              Job ID: {job_id} &nbsp;|&nbsp; This is an automated notification. Please do not reply to this email.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = config.SMTP_USER
     msg["To"] = to_email
 
-    # Plain-text fallback
     text_body = (
-        f"Your video (Job {job_id}) has been successfully processed.\n\n"
-        f"Stages completed:\n"
-        f"  Stage 1 - Video Stabilization\n"
-        f"  Stage 2 - Object Detection\n"
-        f"  Stage 3 - Object Tracking\n"
-        f"  Stage 4 - CSV Postprocessing\n\n"
-        f"Download your results here: {download_url}\n\n"
-        f"Thank you for using TTGUI Video Processor. We appreciate your trust in our platform.\n\n"
-        f"This is an automated notification. Please do not reply to this message."
+        f"Your results are ready for download.\n\n"
+        f"Your video (Job {job_id}) has been processed successfully. The package includes the stabilized video, tracking data (CSV), and background image.\n\n"
+        f"Download: {download_url}\n\n"
+        f"Thank you for using C-LINK TAP Platform. We hope the results meet your expectations.\n\n"
+        f"---\n"
+        f"This is an automated notification. Please do not reply to this email."
     )
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
@@ -78,6 +87,83 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
         server.sendmail(config.SMTP_USER, to_email, msg.as_string())
 
     print(f"[EMAIL] Sent result email to {to_email}")
+
+
+def send_acknowledgment_email(to_email: str, job_id: str):
+    """Send an HTML email confirming that the video upload was received and is being processed."""
+
+    if not config.SMTP_USER or not config.SMTP_PASSWORD:
+        print(
+            f"[EMAIL] SMTP credentials not set. Skipping acknowledgment email to {to_email}"
+        )
+        return
+
+    subject = f"We've Received Your Video — Job {job_id}"
+
+    html_body = f"""\
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e0e0e0;">
+        <tr>
+          <td style="background:#4a6572;padding:28px 40px;">
+            <span style="color:#ffffff;font-size:18px;font-weight:bold;letter-spacing:0.5px;">C-LINK TAP Platform</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:40px;">
+            <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:20px;font-weight:600;">We've received your video.</h2>
+            <p style="margin:0 0 16px;color:#555555;font-size:14px;line-height:1.8;">
+              Your upload has been received and your video is now being analyzed. This process may take some time depending on the length and complexity of the footage.
+            </p>
+            <p style="margin:0 0 32px;color:#555555;font-size:14px;line-height:1.8;">
+              Once the processing is complete, we will send you a follow-up email with a link for you to download your results.
+            </p>
+            <p style="margin:0;color:#555555;font-size:14px;line-height:1.8;">
+              Thank you for choosing C-LINK TAP Platform. We appreciate your trust in our platform.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px;border-top:1px solid #e8e8e8;background:#fafafa;">
+            <p style="margin:0;color:#aaaaaa;font-size:11px;line-height:1.6;">
+              Job ID: {job_id} &nbsp;|&nbsp; This is an automated notification. Please do not reply to this email.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    text_body = (
+        f"We've received your video.\n\n"
+        f"Your upload (Job {job_id}) has been received and is now being analyzed. "
+        f"Once processing is complete, we will send you a follow-up email with a link to download your results.\n\n"
+        f"Thank you for choosing C-LINK TAP Platform. We appreciate your trust in our platform.\n\n"
+        f"---\n"
+        f"This is an automated notification. Please do not reply to this email."
+    )
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = config.SMTP_USER
+    msg["To"] = to_email
+    msg.attach(MIMEText(text_body, "plain"))
+    msg.attach(MIMEText(html_body, "html"))
+
+    with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT) as server:
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+        server.sendmail(config.SMTP_USER, to_email, msg.as_string())
+
+    print(f"[EMAIL] Sent acknowledgment email to {to_email}")
 
 
 def send_contact_email(name: str, email: str, phone: str, subject: str, message: str):
