@@ -73,7 +73,7 @@ def track_from_detection_jsonl(
     class_colors = {
         0: (245, 135, 66),  # c — cornflower blue
         1: (75, 100, 235),  # t — coral
-        2: (160, 190, 0),   # b — teal
+        2: (160, 190, 0),  # b — teal
         3: (210, 90, 175),  # h — orchid
         4: (60, 200, 110),  # g — lime green
         5: (230, 195, 50),  # p — sky blue

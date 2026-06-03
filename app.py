@@ -378,6 +378,7 @@ def download_by_token(token):
             zf.write(csv_path, "processed.csv")
             if os.path.isfile(background_path):
                 zf.write(background_path, "background.png")
+        zip_size = os.path.getsize(tmp_path)
         zip_fh = open(tmp_path, "rb")
     except Exception:
         try:
@@ -387,12 +388,14 @@ def download_by_token(token):
         raise
     os.unlink(tmp_path)
 
-    return send_file(
+    response = send_file(
         zip_fh,
         mimetype="application/zip",
         as_attachment=True,
         download_name=f"{job_id}.zip",
     )
+    response.headers["Content-Length"] = zip_size
+    return response
 
 
 # ---------------------------------------------------------------------------
