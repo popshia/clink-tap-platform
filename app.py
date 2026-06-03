@@ -61,6 +61,7 @@ def _snapshot_job(job_id: str):
         job = jobs.get(job_id)
         return dict(job) if job is not None else None
 
+
 STAGES = [
     "queued",
     "stabilizing",
