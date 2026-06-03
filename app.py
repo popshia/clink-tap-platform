@@ -394,7 +394,7 @@ def download_by_token(token):
         as_attachment=True,
         download_name=f"{job_id}.zip",
     )
-    response.headers["Content-Length"] = zip_size
+    response.headers["Content-Length"] = str(zip_size)
     return response
 
 
