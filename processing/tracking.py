@@ -71,14 +71,14 @@ def track_from_detection_jsonl(
 
     class_map = {0: "c", 1: "t", 2: "b", 3: "h", 4: "g", 5: "p", 6: "u", 7: "m"}
     class_colors = {
-        0: (189, 114, 0),  # c — blue
-        1: (25, 83, 217),  # t — orange
-        2: (32, 177, 237),  # b — yellow
-        3: (142, 47, 126),  # h — purple
-        4: (48, 172, 119),  # g — green
-        5: (238, 190, 77),  # p — cyan
-        6: (47, 20, 162),  # u — red
-        7: (128, 128, 0),  # m — teal
+        0: (245, 135, 66),  # c — cornflower blue
+        1: (75, 100, 235),  # t — coral
+        2: (160, 190, 0),   # b — teal
+        3: (210, 90, 175),  # h — orchid
+        4: (60, 200, 110),  # g — lime green
+        5: (230, 195, 50),  # p — sky blue
+        6: (30, 160, 240),  # u — amber
+        7: (140, 80, 230),  # m — rose
     }
 
     track_info = {}
