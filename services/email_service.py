@@ -41,9 +41,12 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
                 </td>
               </tr>
             </table>
-            <p style="margin:0 0 24px;color:#888888;font-size:12px;line-height:1.6;">
+            <p style="margin:0 0 16px;color:#888888;font-size:12px;line-height:1.6;">
               If the button above does not work, copy and paste the following link into your browser:<br>
               <a href="{download_url}" style="color:#4a6572;word-break:break-all;">{download_url}</a>
+            </p>
+            <p style="margin:0 0 24px;padding:10px 14px;background:#fff8e1;border-left:3px solid #f0b429;color:#7a5c00;font-size:12px;line-height:1.6;">
+              This download link expires in <strong>24 hours</strong>. Please download your results before then.
             </p>
             <p style="margin:0;color:#555555;font-size:14px;line-height:1.8;">
               Thank you for using C-LINK TAP Platform. We hope the results meet your expectations.
@@ -72,6 +75,7 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
         f"Your results are ready for download.\n\n"
         f"Your video (Job {job_id}) has been processed successfully. The package includes the stabilized video, tracking data (CSV), and background image.\n\n"
         f"Download: {download_url}\n\n"
+        f"IMPORTANT: This link expires in 24 hours. Please download your results before then.\n\n"
         f"Thank you for using C-LINK TAP Platform. We hope the results meet your expectations.\n\n"
         f"---\n"
         f"This is an automated notification. Please do not reply to this email."
