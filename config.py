@@ -10,7 +10,9 @@ PROCESSED_FOLDER = os.path.join(BASE_DIR, "processed")
 MODEL_PATH = os.path.join(BASE_DIR, "processing", "models", "yolov11_obb.pt")
 
 # --- Flask ---
-MAX_CONTENT_LENGTH = int(os.environ.get("MAX_CONTENT_LENGTH", str(10 * 1024 * 1024 * 1024)))
+MAX_CONTENT_LENGTH = int(
+    os.environ.get("MAX_CONTENT_LENGTH", str(10 * 1024 * 1024 * 1024))
+)
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
 
 # --- Server ---
