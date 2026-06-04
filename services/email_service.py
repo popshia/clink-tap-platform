@@ -126,7 +126,7 @@ def send_acknowledgment_email(to_email: str, job_id: str):
               Your upload has been received and your video is now being analyzed. This process may take some time depending on the length and complexity of the footage.
             </p>
             <p style="margin:0 0 32px;color:#555555;font-size:14px;line-height:1.8;">
-              Once the processing is complete, we will send you a follow-up email with a link for you to download your results.
+              Once processing is complete, we will send you a follow-up email with a link to download your results.
             </p>
             <p style="margin:0;color:#555555;font-size:14px;line-height:1.8;">
               Thank you for choosing C-LINK TAP Platform. We appreciate your trust in our platform.
