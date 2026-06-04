@@ -1,4 +1,4 @@
-# TTGUI Web — Traffic Video Analysis Platform
+# C-LINK TAP Platform
 
 A web application for analyzing traffic videos from aerial (drone) footage. Upload a video, and the system automatically stabilizes it, detects and tracks vehicles using a YOLOv11 OBB model, post-processes the raw trajectories into clean CSVs, and emails you a secure download link when the job is done.
 
@@ -71,7 +71,7 @@ In production, Flask serves the pre-built Vue SPA from `frontend/dist/` and fall
 
 ```bash
 git clone <repo-url>
-cd TTGUI_Web
+cd clink-tap-platform
 uv sync
 ```
 
@@ -158,7 +158,7 @@ npm run dev
 ## Project Structure
 
 ```
-TTGUI_Web/
+clink-tap-platform/
 ├── app.py                  # Flask app, routes, job queue, chunked upload handling
 ├── config.py               # All configuration constants (paths, SMTP, limits)
 ├── pyproject.toml          # Project metadata, uv dependencies, Ruff linting config

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**TTGUI Web** is a traffic video analysis platform that processes aerial (drone) footage to detect and track vehicles. The system is a Flask + Vue 3 stack with a CPU/GPU-optimized Python backend for video processing.
+**C-LINK TAP Platform** is a traffic video analysis platform that processes aerial (drone) footage to detect and track vehicles. The system is a Flask + Vue 3 stack with a CPU/GPU-optimized Python backend for video processing.
 
 ### What It Does
 
@@ -42,7 +42,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Directory Structure
 
 ```
-TTGUI_Web/
+clink-tap-platform/
 ├── app.py                      # Flask app, routes, job queue, chunked upload handling
 ├── config.py                   # Configuration constants (paths, SMTP, limits)
 ├── requirements.txt            # Python dependencies (managed via uv)

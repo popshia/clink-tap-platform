@@ -1,5 +1,5 @@
 [project]
-name = "ttgui-web"
+name = "clink-tap-platform"
 version = "1.0.0"
 requires-python = "==3.11.15"
 dependencies = [
