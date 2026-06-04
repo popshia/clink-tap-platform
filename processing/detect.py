@@ -20,14 +20,14 @@ def _result_to_dets(result):
     return np.empty((0, 7), dtype=np.float32)
 
 
-def detect_and_export_as_jsonl(
+def export_background_and_detection_as_jsonl(
     input_video_path,
     model_path,
     detections_path,
     background_path,
-    on_progress=None,
     frame_stride=5,
     max_frames=150,
+    on_progress=None,
 ):
     model = YOLO(model_path)
     device = (
@@ -85,6 +85,6 @@ if __name__ == "__main__":
     parser.add_argument("background")
     args = parser.parse_args()
 
-    detect_and_export_as_jsonl(
+    export_background_and_detection_as_jsonl(
         args.input_file, args.model, args.detections, args.background
     )

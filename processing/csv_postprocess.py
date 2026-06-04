@@ -340,7 +340,7 @@ def process_single_vehicle(row_data, config):
     return meta_info + [str(v) for v in flat_coords]
 
 
-def process_trajectory_file(input_csv, output_csv):
+def process_trajectory_csv_file(input_csv, output_csv):
     """主函數：讀取、處理並儲存軌跡檔"""
     logger.info("開始讀取資料...")
     config = TrajectoryConfig()
@@ -370,4 +370,4 @@ def process_trajectory_file(input_csv, output_csv):
 if __name__ == "__main__":
     INPUT_FILE = "raw_trajectory.csv"
     OUTPUT_FILE = "fixed_trajectory.csv"
-    process_trajectory_file(INPUT_FILE, OUTPUT_FILE)
+    process_trajectory_csv_file(INPUT_FILE, OUTPUT_FILE)
