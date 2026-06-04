@@ -85,8 +85,7 @@ cp .env.example .env
 | Variable              | Default                         | Description                                          |
 |-----------------------|---------------------------------|------------------------------------------------------|
 | `SECRET_KEY`          | `dev-secret-key-change-me`      | Flask session secret (also used for HMAC tokens)     |
-| `FLASK_APP`           | `app.py`                        | Flask entry point                                    |
-| `FLASK_ENV`           | `development`                   | Flask environment (`development` / `production`)     |
+| `FLASK_DEBUG`         | `false`                         | Set to `true` in development to enable auto-reload and the interactive debugger |
 | `SERVER_HOST`         | `127.0.0.1`                     | Host to bind Flask                                   |
 | `SERVER_PORT`         | `5000`                          | Port to bind Flask                                   |
 | `SERVER_URL`          | `http://127.0.0.1:5000`         | Public URL used in email download links              |
@@ -162,7 +161,7 @@ npm run dev
 TTGUI_Web/
 ├── app.py                  # Flask app, routes, job queue, chunked upload handling
 ├── config.py               # All configuration constants (paths, SMTP, limits)
-├── pyproject.toml          # Ruff linting configuration
+├── pyproject.toml          # Project metadata, uv dependencies, Ruff linting config
 ├── requirements.txt        # Python dependencies (managed via uv)
 ├── .env.example            # Environment variable template
 ├── CONTRIBUTING.md         # Branching, PR, and code style guide

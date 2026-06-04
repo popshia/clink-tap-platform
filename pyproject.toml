@@ -1,3 +1,60 @@
+[project]
+name = "ttgui-web"
+version = "1.0.0"
+requires-python = "==3.11.15"
+dependencies = [
+    "flask==3.1.3",
+    "flask-cors==6.0.2",
+    "torch==2.3.1; sys_platform == 'linux'",
+    "torch; sys_platform == 'darwin'",
+    "torchvision==0.18.1; sys_platform == 'linux'",
+    "torchvision; sys_platform == 'darwin'",
+    "torchaudio==2.3.1; sys_platform == 'linux'",
+    "torchaudio; sys_platform == 'darwin'",
+    "kornia==0.8.3",
+    "boxmot==20.0.0",
+    "ultralytics>=8.3.0",
+    "opencv-python==4.13.0.92",
+    "numpy==2.4.4",
+    "pandas==2.3.3",
+    "loguru==0.7.3",
+    "scipy==1.17.1",
+    "scikit-learn==1.8.0",
+    "requests==2.34.2",
+    "python-dotenv==1.2.2",
+    "pillow==12.2.0",
+    "matplotlib==3.10.9",
+    "huggingface-hub==1.16.1",
+    "gdown==5.2.2",
+    "psutil==7.2.2",
+    "pyyaml==6.0.3",
+    "httpx==0.28.1",
+]
+
+# Solve for both platforms in a single uv.lock
+[tool.uv]
+environments = [
+    "sys_platform == 'darwin'",
+    "sys_platform == 'linux'",
+]
+
+# PyTorch CUDA 12.1 index — used on Linux only; macOS gets PyPI torch (includes MPS)
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu121", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cu121", marker = "sys_platform == 'linux'" },
+]
+torchaudio = [
+    { index = "pytorch-cu121", marker = "sys_platform == 'linux'" },
+]
+
 [tool.ruff]
 line-length = 88
 target-version = "py311"
