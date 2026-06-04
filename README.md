@@ -162,8 +162,8 @@ TTGUI_Web/
 ├── app.py                  # Flask app, routes, job queue, chunked upload handling
 ├── config.py               # All configuration constants (paths, SMTP, limits)
 ├── pyproject.toml          # Project metadata, uv dependencies, Ruff linting config
-├── requirements.txt        # Python dependencies (managed via uv)
 ├── .env.example            # Environment variable template
+├── uv.lock                 # Lockfile for Python dependencies (managed via uv)
 ├── CONTRIBUTING.md         # Branching, PR, and code style guide
 │
 ├── processing/
