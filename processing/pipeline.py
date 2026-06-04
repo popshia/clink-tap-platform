@@ -9,8 +9,8 @@ from typing import Callable, Optional
 from loguru import logger
 
 import config
-from processing.csv_postprocess import process_trajectory_file
-from processing.detect import detect_and_export_as_jsonl
+from processing.csv_postprocess import process_trajectory_csv_file
+from processing.detect import export_background_and_detection_as_jsonl
 from processing.stabilize import stabilize_video
 from processing.tracking import track_from_detection_jsonl
 
@@ -78,11 +78,13 @@ def run_pipeline(
     detections_path = os.path.join(output_dir, "detections.jsonl")
     background_path = os.path.join(output_dir, "background.png")
     log("detecting", 0)
-    detect_and_export_as_jsonl(
+    export_background_and_detection_as_jsonl(
         stabilized_path,
         config.MODEL_PATH,
         detections_path,
         background_path,
+        frame_stride=5,
+        max_frames=150,
         on_progress=lambda pct: log("detecting", pct),
     )
     log("detecting", 100)
@@ -104,7 +106,7 @@ def run_pipeline(
     # ── Stage 4: CSV file fixing ──
     processed_csv = os.path.join(output_dir, "processed.csv")
     log("csv_postprocessing", 0)
-    process_trajectory_file(raw_csv, processed_csv)
+    process_trajectory_csv_file(raw_csv, processed_csv)
     log("csv_postprocessing", 100)
 
     elapsed = time.perf_counter() - start
