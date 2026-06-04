@@ -208,13 +208,7 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,python
 
-uploads/
 processed/
 processing/*.mp4
 processing/models/*
-test/
-uv.lock
 .claude/
-processing/tools/*.txt
-frontend/frontend.txt
-backend.txt

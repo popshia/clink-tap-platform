@@ -1,4 +1,4 @@
-# TTGUI Web — Traffic Video Analysis Platform
+# C-LINK TAP Platform
 
 A web application for analyzing traffic videos from aerial (drone) footage. Upload a video, and the system automatically stabilizes it, detects and tracks vehicles using a YOLOv11 OBB model, post-processes the raw trajectories into clean CSVs, and emails you a secure download link when the job is done.
 
@@ -71,26 +71,25 @@ In production, Flask serves the pre-built Vue SPA from `frontend/dist/` and fall
 
 ```bash
 git clone <repo-url>
-cd TTGUI_Web
+cd clink-tap-platform
 uv sync
 ```
 
 ### 2. Configure environment variables
 
 ```bash
-export SECRET_KEY="your-secret-key"
-export SERVER_URL="http://your-server-address:5000"
-export SMTP_USER="your-email@gmail.com"
-export SMTP_PASSWORD="your-gmail-app-password"
-export CONTACT_RECIPIENT="support@your-domain.com"  # optional
+cp .env.example .env
+# Edit .env with your values
 ```
 
 | Variable              | Default                         | Description                                          |
 |-----------------------|---------------------------------|------------------------------------------------------|
 | `SECRET_KEY`          | `dev-secret-key-change-me`      | Flask session secret (also used for HMAC tokens)     |
+| `FLASK_DEBUG`         | `false`                         | Set to `true` in development to enable auto-reload and the interactive debugger |
 | `SERVER_HOST`         | `127.0.0.1`                     | Host to bind Flask                                   |
 | `SERVER_PORT`         | `5000`                          | Port to bind Flask                                   |
 | `SERVER_URL`          | `http://127.0.0.1:5000`         | Public URL used in email download links              |
+| `MAX_CONTENT_LENGTH`  | `10737418240` (10 GB)           | Maximum upload size in bytes                         |
 | `SMTP_USER`           | *(empty)*                       | Gmail address for sending result emails              |
 | `SMTP_PASSWORD`       | *(empty)*                       | Gmail App Password                                   |
 | `CONTACT_RECIPIENT`   | *(falls back to `SMTP_USER`)*   | Inbox that receives "Contact Us" submissions         |
@@ -159,9 +158,14 @@ npm run dev
 ## Project Structure
 
 ```
-TTGUI_Web/
+clink-tap-platform/
 ├── app.py                  # Flask app, routes, job queue, chunked upload handling
 ├── config.py               # All configuration constants (paths, SMTP, limits)
+├── pyproject.toml          # Project metadata, uv dependencies, Ruff linting config
+├── .env.example            # Environment variable template
+├── uv.lock                 # Lockfile for Python dependencies (managed via uv)
+├── CONTRIBUTING.md         # Branching, PR, and code style guide
+│
 ├── processing/
 │   ├── pipeline.py         # Orchestrates the 4-stage pipeline
 │   ├── stabilize.py        # ECC video stabilization (Kornia, GPU/MPS/CPU)
@@ -170,9 +174,12 @@ TTGUI_Web/
 │   ├── csv_postprocess.py  # Trajectory smoothing, validation, rotation handling
 │   ├── models/
 │   │   └── yolov11_obb.pt  # YOLOv11 OBB model weights (not in repo — user-provided)
-│   └── tools/              # Helper scripts (e.g. CSV row-length checks)
+│   └── tools/
+│       └── check_row_length.py  # Helper script for CSV validation
+│
 ├── services/
 │   └── email_service.py    # Gmail SMTP: result emails + "Contact Us" forwarding
+│
 ├── frontend/               # Vue 3 + Vite SPA
 │   ├── src/
 │   │   ├── App.vue
@@ -181,8 +188,33 @@ TTGUI_Web/
 │   │       ├── JobStatus.vue      # Polling status, stage progress, download button
 │   │       └── ContactWidget.vue  # Floating "Contact Us" button + form modal
 │   └── dist/               # Production build output (served by Flask)
-├── docs/                   # Trajectory format spec + tracking-parameter notes
+│
+├── docs/
+│   ├── ocsort_tracking_params.md   # Tracking parameter tuning guide
+│   └── su_軌跡檔格式定義.xlsx      # Trajectory CSV format specification
+│
 ├── processed/              # Per-job staging and output directories (auto-created)
-├── requirements.txt
-└── uv.lock
+├── uploads/                # Temporary chunk upload directory (auto-created)
+│
+└── .github/
+    ├── pull_request_template.md
+    └── workflows/
+        └── ci.yml          # Ruff lint + frontend build (runs on PRs)
 ```
+
+---
+
+## CI/CD
+
+GitHub Actions runs on every pull request:
+
+1. **Lint Python** — Ruff (`E`, `F`, `I` rules; `E501` line-length ignored)
+2. **Build frontend** — `npm ci && npm run build`
+
+No deployment automation. Build and run manually for production.
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branching conventions, PR guidelines, and code style.
