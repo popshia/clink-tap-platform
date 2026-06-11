@@ -56,14 +56,13 @@ def run_pipeline(
             on_progress(stage, pct)
         logger.info(f"[PIPELINE] {job_id} | {stage} ({pct}%)")
 
+    video_basename = os.path.splitext(os.path.basename(upload_video))[0]
     ext = os.path.splitext(upload_video)[1] or ".mp4"
 
     start = time.perf_counter()
 
     # ── Stage 1: Video Stabilization ──
-    stabilized_video = os.path.join(
-        output_dir, f"{upload_video.split('/')[-1].split('.')[0]}_stabilized{ext}"
-    )
+    stabilized_video = os.path.join(output_dir, f"{video_basename}_stabilized{ext}")
     log("stabilizing", 0)
     stabilize_video(
         upload_video,
@@ -86,8 +85,7 @@ def run_pipeline(
     log("detecting", 100)
 
     # ── Stage 3: Tracking ──
-    video_base_name = upload_video.split("/")[-1].split(".")[0]
-    plotted_video = os.path.join(output_dir, f"{video_base_name}_tracked{ext}")
+    plotted_video = os.path.join(output_dir, f"{video_basename}_tracked{ext}")
     raw_csv = os.path.join(output_dir, "raw.csv")
     log("tracking", 0)
     track_from_detection_jsonl(
