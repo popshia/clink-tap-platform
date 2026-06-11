@@ -33,7 +33,7 @@ def format_duration(seconds: float) -> str:
 
 
 def run_pipeline(
-    input_path: str,
+    upload_video: str,
     output_dir: str,
     job_id: str,
     on_progress: Optional[Callable[[str, int], None]] = None,
@@ -56,48 +56,44 @@ def run_pipeline(
             on_progress(stage, pct)
         logger.info(f"[PIPELINE] {job_id} | {stage} ({pct}%)")
 
-    ext = os.path.splitext(input_path)[1] or ".mp4"
+    ext = os.path.splitext(upload_video)[1] or ".mp4"
 
     start = time.perf_counter()
 
     # ── Stage 1: Video Stabilization ──
-    stabilized_path = os.path.join(
-        output_dir, f"{input_path.split('/')[-1].split('.')[0]}_stabilized{ext}"
+    stabilized_video = os.path.join(
+        output_dir, f"{upload_video.split('/')[-1].split('.')[0]}_stabilized{ext}"
     )
     log("stabilizing", 0)
     stabilize_video(
-        input_path,
-        stabilized_path,
-        (1920, 1080),
-        0.5,
+        upload_video,
+        stabilized_video,
         on_progress=lambda pct: log("stabilizing", pct),
     )
     log("stabilizing", 100)
 
     # ── Stage 2: OBB Detection ──
-    detections_path = os.path.join(output_dir, "detections.jsonl")
-    background_path = os.path.join(output_dir, "background.png")
+    detections = os.path.join(output_dir, "detections.jsonl")
+    background_image = os.path.join(output_dir, "background.png")
     log("detecting", 0)
     export_background_and_detection_as_jsonl(
-        stabilized_path,
+        stabilized_video,
         config.MODEL_PATH,
-        detections_path,
-        background_path,
-        frame_stride=5,
-        max_frames=150,
+        detections,
+        background_image,
         on_progress=lambda pct: log("detecting", pct),
     )
     log("detecting", 100)
 
     # ── Stage 3: Tracking ──
-    base = input_path.split("/")[-1].split(".")[0]
-    tracked_path = os.path.join(output_dir, f"{base}_tracked{ext}")
+    video_base_name = upload_video.split("/")[-1].split(".")[0]
+    plotted_video = os.path.join(output_dir, f"{video_base_name}_tracked{ext}")
     raw_csv = os.path.join(output_dir, "raw.csv")
     log("tracking", 0)
     track_from_detection_jsonl(
-        stabilized_path,
-        detections_path,
-        tracked_path,
+        stabilized_video,
+        detections,
+        plotted_video,
         raw_csv,
         on_progress=lambda pct: log("tracking", pct),
     )
@@ -113,10 +109,15 @@ def run_pipeline(
     logger.info(f"Processing time: {format_duration(elapsed)}")
 
     # Clean up input and intermediate files (keep only the final output)
-    for intermediate in [input_path, stabilized_path, detections_path, raw_csv]:
+    for intermediate in [
+        upload_video,
+        stabilized_video,
+        detections,
+        raw_csv,
+    ]:
         try:
             os.remove(intermediate)
         except OSError:
             pass
 
-    return tracked_path
+    return plotted_video
