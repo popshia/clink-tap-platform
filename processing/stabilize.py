@@ -182,7 +182,9 @@ def stabilize_video(
             # from this frame's failed solve — otherwise a single bad frame
             # cascades through every subsequent frame.
             with torch.no_grad():
-                registrator.model.model.data.copy_(last_h.unsqueeze(0))
+                registrator.model.model.data.copy_(
+                    last_h.view_as(registrator.model.model.data)
+                )
 
         frame_idx += 1
         if on_progress and total_frames > 0:
@@ -221,7 +223,9 @@ def stabilize_video(
         try:
             curr_tensor = to_color_tensor(curr_resized)
             with torch.no_grad():
-                registrator.model.model.data.copy_(H_smoothed[frame_idx].unsqueeze(0))
+                registrator.model.model.data.copy_(
+                    H_smoothed[frame_idx].view_as(registrator.model.model.data)
+                )
                 stabilized = registrator.warp_src_into_dst(curr_tensor)
             out.write(to_bgr(stabilized))
         except Exception as e:
