@@ -1,0 +1,3 @@
+- Wobble still visible → bump smoothing_sigma to 25–30.
+- Stabilized output looks slightly delayed behind real camera motion (drone panning fast) → drop smoothing_sigma to 5–8.
+- Coarse jumps persist on fast scenes → max_iter 20 → 40 (cost: pass 1 gets slower roughly proportionally).
