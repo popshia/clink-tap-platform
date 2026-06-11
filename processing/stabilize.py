@@ -167,12 +167,22 @@ def stabilize_video(
                 opt.step(closure)
 
             with torch.no_grad():
-                H_list.append(registrator.model().detach().clone().squeeze(0))
+                h_curr = registrator.model().detach().clone().squeeze(0)
+                if not torch.isfinite(h_curr).all():
+                    raise ValueError("non-finite H from optimizer")
+            H_list.append(h_curr)
         except Exception as e:
             logger.warning(
                 f"Frame {frame_idx}: GPU ECC failed ({e}). Reusing previous H."
             )
-            H_list.append(H_list[-1].clone())
+            last_h = H_list[-1].clone()
+            H_list.append(last_h)
+            # Reset the model parameter to the last known-good H so the next
+            # frame's warm start isn't poisoned by NaN/Inf or a partial update
+            # from this frame's failed solve — otherwise a single bad frame
+            # cascades through every subsequent frame.
+            with torch.no_grad():
+                registrator.model.model.data.copy_(last_h.unsqueeze(0))
 
         frame_idx += 1
         if on_progress and total_frames > 0:
