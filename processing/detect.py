@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from ultralytics import YOLO
 
+
 def _result_to_dets(result):
     obb = result.obb if result.obb is not None else None
 

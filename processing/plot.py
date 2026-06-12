@@ -8,14 +8,14 @@ import numpy as np
 FRONT_LEFT, FRONT_RIGHT, REAR_RIGHT, REAR_LEFT = 0, 1, 2, 3
 
 CLASS_COLORS = {
-    "c": (220, 100, 30),   # car        — 藍
-    "t": (30, 140, 240),   # truck      — 橘
-    "b": (40, 200, 40),    # bus        — 綠
-    "h": (200, 60, 180),   # truck head — 紫
-    "g": (180, 120, 0),    # truck tail — 青
-    "p": (220, 220, 0),    # pedestrian — 黃
-    "u": (255, 180, 0),    # bike       — 青藍 (cyan)
-    "m": (100, 80, 255),   # motorcycle — 粉橘
+    "c": (220, 100, 30),  # car        — 藍
+    "t": (30, 140, 240),  # truck      — 橘
+    "b": (40, 200, 40),  # bus        — 綠
+    "h": (200, 60, 180),  # truck head — 紫
+    "g": (180, 120, 0),  # truck tail — 青
+    "p": (220, 220, 0),  # pedestrian — 黃
+    "u": (255, 180, 0),  # bike       — 青藍 (cyan)
+    "m": (100, 80, 255),  # motorcycle — 粉橘
 }
 
 FRONT_HIGHLIGHT_COLOR = (0, 0, 255)  # BGR red
@@ -45,9 +45,9 @@ def _load_processed_csv(csv_path):
                 if frame_num > exit_frame:
                     break
 
-                corners = np.array(coords[i * 8 : (i + 1) * 8], dtype=np.float32).reshape(
-                    4, 2
-                )
+                corners = np.array(
+                    coords[i * 8 : (i + 1) * 8], dtype=np.float32
+                ).reshape(4, 2)
                 frame_tracks.setdefault(frame_num, []).append(
                     {
                         "id": obj_id,
