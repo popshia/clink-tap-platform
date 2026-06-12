@@ -46,7 +46,7 @@ def _obb_corners(cx, cy, w, h, angle_rad):
 
 
 def _write_track_csv(output_csv_path, track_info):
-    with open(output_csv_path, "w", newline="") as f:
+    with open(output_csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
 
         for obj_id, info in track_info.items():
