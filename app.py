@@ -72,6 +72,7 @@ STAGES = [
     "detecting",
     "tracking",
     "csv_postprocessing",
+    "plotting",
     "emailing",
     "done",
 ]

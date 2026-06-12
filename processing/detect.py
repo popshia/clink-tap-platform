@@ -6,7 +6,6 @@ import numpy as np
 import torch
 from ultralytics import YOLO
 
-
 def _result_to_dets(result):
     obb = result.obb if result.obb is not None else None
 
@@ -25,8 +24,8 @@ def export_background_and_detection_as_jsonl(
     model_path,
     detections_path,
     background_path,
-    frame_stride=5,
-    max_frames=150,
+    frame_stride=1,
+    max_frames=None,
     on_progress=None,
 ):
     model = YOLO(model_path)
@@ -48,8 +47,9 @@ def export_background_and_detection_as_jsonl(
             if not success:
                 break
 
-            if len(bg_frames) < max_frames and frame_index % frame_stride == 0:
-                bg_frames.append(frame.copy())
+            if frame_index % frame_stride == 0:
+                if max_frames is None or len(bg_frames) < max_frames:
+                    bg_frames.append(frame.copy())
 
             result = model.predict(frame, device=device, verbose=False)[0]
             dets = _result_to_dets(result)

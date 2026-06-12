@@ -123,6 +123,7 @@ const STAGES = [
     "detecting",
     "tracking",
     "csv_postprocessing",
+    "plotting",
     "emailing",
     "done",
 ];
@@ -146,6 +147,7 @@ export default {
                 { id: "detecting", label: "Object Detection" },
                 { id: "tracking", label: "Object Tracking" },
                 { id: "csv_postprocessing", label: "CSV Postprocessing" },
+                { id: "plotting", label: "Video Plotting" },
                 { id: "emailing", label: "Sending Email" },
             ],
         };
@@ -173,6 +175,8 @@ export default {
                 tracking: "Following detected objects across frames over time...",
                 csv_postprocessing:
                     "Compiling detection data into structured CSV results...",
+                plotting:
+                    "Rendering tracked vehicles onto the stabilized video...",
                 emailing: "Packaging results and sending them to your inbox...",
             };
             return descriptions[this.stage] ?? "Waiting in queue…";

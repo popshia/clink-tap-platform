@@ -39,10 +39,41 @@ def _load_detections(detections_path):
     return detections
 
 
+def _obb_corners(cx, cy, w, h, angle_rad):
+    return cv2.boxPoints(
+        ((cx, cy), (w, h), float(np.degrees(angle_rad)))
+    ).astype(int)
+
+
+def _write_track_csv(output_csv_path, track_info):
+    with open(output_csv_path, "w", newline="") as f:
+        writer = csv.writer(f)
+
+        for obj_id, info in track_info.items():
+            enter, exit_ = info["enter_frame"], info["exit_frame"]
+            coords = info["coords"]
+            frame_nums = sorted(coords.keys())
+
+            row = [obj_id, enter, exit_, "X", "X", info["cls_idx"]]
+            for frame_num in range(enter, exit_ + 1):
+                if frame_num in coords:
+                    row.extend(coords[frame_num])
+                else:
+                    before = [f for f in frame_nums if f < frame_num]
+                    after = [f for f in frame_nums if f > frame_num]
+                    f0, f1 = before[-1], after[0]
+                    t = (frame_num - f0) / (f1 - f0)
+                    c0, c1 = coords[f0], coords[f1]
+                    interpolated = [
+                        round(c0[i] + t * (c1[i] - c0[i])) for i in range(len(c0))
+                    ]
+                    row.extend(interpolated)
+            writer.writerow(row)
+
+
 def track_from_detection_jsonl(
     input_video_path,
     detections_path,
-    output_video_path,
     output_csv_path,
     on_progress=None,
 ):
@@ -60,26 +91,10 @@ def track_from_detection_jsonl(
         asso_func="iou",
     )
 
-    cap = cv2.VideoCapture(input_video_path)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
-
     class_map = {0: "c", 1: "t", 2: "b", 3: "h", 4: "g", 5: "p", 6: "u", 7: "m"}
-    class_colors = {
-        0: (245, 135, 66),  # c — cornflower blue
-        1: (75, 100, 235),  # t — coral
-        2: (160, 190, 0),  # b — teal
-        3: (210, 90, 175),  # h — orchid
-        4: (60, 200, 110),  # g — lime green
-        5: (230, 195, 50),  # p — sky blue
-        6: (30, 160, 240),  # u — amber
-        7: (140, 80, 230),  # m — rose
-    }
+
+    cap = cv2.VideoCapture(input_video_path)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     track_info = {}
     frame_index = 0
@@ -97,18 +112,12 @@ def track_from_detection_jsonl(
         # tracks: [cx, cy, w, h, angle_rad, id, conf, cls, det_ind] — shape (M, 9)
         tracks = tracker.update(dets, frame)
 
-        annotated = frame.copy()
-
         if len(tracks) > 0:
             for track in tracks:
-                cx, cy, w, h, angle, t_id, conf, cls_raw, _ = track
+                cx, cy, w, h, angle, t_id, _conf, cls_raw, _ = track
                 t_id = int(t_id)
                 cls_idx = class_map.get(int(cls_raw), str(int(cls_raw)))
-
-                # cv2.boxPoints expects angle in degrees
-                corners = cv2.boxPoints(
-                    ((cx, cy), (w, h), float(np.degrees(angle)))
-                ).astype(int)
+                corners = _obb_corners(cx, cy, w, h, angle)
 
                 if t_id not in track_info:
                     track_info[t_id] = {
@@ -120,19 +129,6 @@ def track_from_detection_jsonl(
                 track_info[t_id]["exit_frame"] = frame_index
                 track_info[t_id]["coords"][frame_index] = corners.flatten().tolist()
 
-                color = class_colors.get(int(cls_raw), (255, 255, 255))
-                cv2.polylines(annotated, [corners.reshape((-1, 1, 2))], True, color, 2)
-                cv2.putText(
-                    annotated,
-                    f"{cls_idx} {t_id}",
-                    tuple(corners[0]),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    color,
-                    2,
-                )
-
-        out.write(annotated)
         frame_index += 1
         if on_progress and total_frames > 0:
             pct = min(99, int(frame_index / total_frames * 100))
@@ -141,43 +137,16 @@ def track_from_detection_jsonl(
                 last_pct = pct
 
     cap.release()
-    out.release()
 
     if output_csv_path:
-        with open(output_csv_path, "w", newline="") as f:
-            writer = csv.writer(f)
-
-            for obj_id, info in track_info.items():
-                enter, exit_ = info["enter_frame"], info["exit_frame"]
-                coords = info["coords"]
-                frame_nums = sorted(coords.keys())
-
-                row = [obj_id, enter, exit_, "X", "X", info["cls_idx"]]
-                for frame_num in range(enter, exit_ + 1):
-                    if frame_num in coords:
-                        row.extend(coords[frame_num])
-                    else:
-                        # Interpolate between nearest known frames on each side
-                        before = [f for f in frame_nums if f < frame_num]
-                        after = [f for f in frame_nums if f > frame_num]
-                        f0, f1 = before[-1], after[0]
-                        t = (frame_num - f0) / (f1 - f0)
-                        c0, c1 = coords[f0], coords[f1]
-                        interpolated = [
-                            round(c0[i] + t * (c1[i] - c0[i])) for i in range(len(c0))
-                        ]
-                        row.extend(interpolated)
-                writer.writerow(row)
+        _write_track_csv(output_csv_path, track_info)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("input_file")
     parser.add_argument("detections")
-    parser.add_argument("output_file")
     parser.add_argument("csv")
     args = parser.parse_args()
 
-    track_from_detection_jsonl(
-        args.input_file, args.detections, args.output_file, args.csv
-    )
+    track_from_detection_jsonl(args.input_file, args.detections, args.csv)

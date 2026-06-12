@@ -1,5 +1,5 @@
 """
-Processing Pipeline – orchestrates stabilization → detection → tracking.
+Processing Pipeline – orchestrates stabilization → detection → tracking → plot.
 """
 
 import os
@@ -11,6 +11,7 @@ from loguru import logger
 import config
 from processing.csv_postprocess import process_trajectory_csv_file
 from processing.detect import export_background_and_detection_as_jsonl
+from processing.plot import plot_trajectory_video
 from processing.stabilize import stabilize_video
 from processing.tracking import track_from_detection_jsonl
 
@@ -39,7 +40,7 @@ def run_pipeline(
     on_progress: Optional[Callable[[str, int], None]] = None,
 ) -> str:
     """
-    Run the full 3-stage video processing pipeline.
+    Run the full video processing pipeline.
 
     Args:
         input_path: Path to the uploaded video.
@@ -91,17 +92,27 @@ def run_pipeline(
     track_from_detection_jsonl(
         stabilized_video,
         detections,
-        plotted_video,
+        # plotted_video,
         raw_csv,
         on_progress=lambda pct: log("tracking", pct),
     )
     log("tracking", 100)
 
-    # ── Stage 4: CSV file fixing ──
+    # ── Stage 4: CSV post-processing ──
     processed_csv = os.path.join(output_dir, "processed.csv")
     log("csv_postprocessing", 0)
     process_trajectory_csv_file(raw_csv, processed_csv)
     log("csv_postprocessing", 100)
+
+    # ── Stage 5: Plot annotated video from processed CSV ──
+    log("plotting", 0)
+    plot_trajectory_video(
+        stabilized_video,
+        processed_csv,
+        plotted_video,
+        on_progress=lambda pct: log("plotting", pct),
+    )
+    log("plotting", 100)
 
     elapsed = time.perf_counter() - start
     logger.info(f"Processing time: {format_duration(elapsed)}")
