@@ -7,6 +7,7 @@ import numpy as np
 # Corner order from csv_postprocess: LF, RF, RB, LB
 FRONT_LEFT, FRONT_RIGHT, REAR_RIGHT, REAR_LEFT = 0, 1, 2, 3
 
+# fmt: off
 CLASS_COLORS = {
     "c": (255, 80, 0),    # car        — blue       hue 210°
     "t": (0, 165, 255),   # truck      — orange     hue  30°
@@ -17,6 +18,7 @@ CLASS_COLORS = {
     "u": (0, 255, 128),   # bike       — chartreuse hue  90°
     "m": (147, 20, 255),  # motorcycle — hot pink   hue 330°
 }
+# fmt: on
 
 FRONT_HIGHLIGHT_COLOR = (0, 0, 255)  # BGR red — marks vehicle front edge
 DEFAULT_COLOR = (255, 255, 255)
