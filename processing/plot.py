@@ -120,6 +120,8 @@ def plot_trajectory_video(
 
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+    if not out.isOpened():
+        raise ValueError(f"Failed to open VideoWriter for path: {output_video_path}")
 
     frame_index = 0
     last_pct = -1
