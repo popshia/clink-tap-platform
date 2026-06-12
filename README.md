@@ -10,6 +10,7 @@ A web application for analyzing traffic videos from aerial (drone) footage. Uplo
 - **Object Detection** — YOLOv11 Oriented Bounding Box (OBB) model; detections exported as JSONL for streaming
 - **Class-Aware Tracking** — OcSort tracker with per-class isolation to prevent track ID swaps between different vehicle types
 - **Trajectory CSV Export** — Per-vehicle frame-by-frame OBB corner coordinates, cleaned and smoothed with configurable parameters
+- **Annotated Video Output** — Trajectory plot stage re-renders the stabilized video with OBB overlays (class-colored edges, red front-edge highlight, track ID labels) drawn from the post-processed CSV
 - **Email Notification** — Gmail SMTP delivers an HTML email with a secure (HMAC-signed) download link once processing is complete
 - **Job Queue** — Single-worker background queue ensures jobs run sequentially and the server stays responsive
 - **Contact Us Widget** — A floating button opens an in-app contact form (name, email, phone, subject, message) forwarded to the support inbox via Gmail SMTP
@@ -45,10 +46,11 @@ Flask backend (app.py)
     ├── Background thread (queue.Queue, single worker)
     │
     └── Processing Pipeline (pipeline.py)
-            ├── Stage 1 — stabilize.py      (ECC homography, Kornia GPU/MPS)
-            ├── Stage 2 — detect.py         (YOLOv11 OBB inference → JSONL)
-            ├── Stage 3 — tracking.py       (OcSort per-class tracking → raw.csv)
-            └── Stage 4 — csv_postprocess.py (trajectory smoothing → processed.csv)
+            ├── Stage 1 — stabilize.py       (ECC homography, Kornia GPU/MPS)
+            ├── Stage 2 — detect.py          (YOLOv11 OBB inference → JSONL)
+            ├── Stage 3 — tracking.py        (OcSort per-class tracking → raw.csv)
+            ├── Stage 4 — csv_postprocess.py (trajectory smoothing → processed.csv)
+            └── Stage 5 — plot.py            (OBB annotation overlay → tracked video)
 ```
 
 In production, Flask serves the pre-built Vue SPA from `frontend/dist/` and falls back to `index.html` for client-side routing.
@@ -149,7 +151,7 @@ npm run dev
 | `GET`  | `/api/dl/<token>`          | Download ZIP (tracked video + processed CSV + background image) using the HMAC-signed token from the status response.          |
 | `POST` | `/api/contact`             | Submit a "Contact Us" message. Body: `application/json` with `name`, `email`, `message` (required) and optional `phone`, `subject`. |
 
-**Processing stages (in order):** `queued` → `stabilizing` → `detecting` → `tracking` → `csv_postprocessing` → `emailing` → `done`
+**Processing stages (in order):** `queued` → `stabilizing` → `detecting` → `tracking` → `csv_postprocessing` → `plotting` → `emailing` → `done`
 
 **Accepted video formats:** `mp4`, `avi`, `mov`, `mkv`, `webm` (max 10 GB)
 
@@ -172,6 +174,7 @@ clink-tap-platform/
 │   ├── detect.py           # YOLOv11 OBB inference, exports detections as JSONL
 │   ├── tracking.py         # OcSort per-class tracking, writes raw.csv
 │   ├── csv_postprocess.py  # Trajectory smoothing, validation, rotation handling
+│   ├── plot.py             # OBB annotation overlay drawn from processed.csv → tracked video
 │   ├── models/
 │   │   └── yolov11_obb.pt  # YOLOv11 OBB model weights (not in repo — user-provided)
 │   └── tools/
