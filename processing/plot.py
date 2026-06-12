@@ -87,10 +87,10 @@ def _draw_vehicle(frame, vehicle):
     track_id = vehicle["id"]
     color = CLASS_COLORS.get(cls_idx, DEFAULT_COLOR)
 
-    lf = tuple(corners[FRONT_LEFT])
-    rf = tuple(corners[FRONT_RIGHT])
-    rb = tuple(corners[REAR_RIGHT])
-    lb = tuple(corners[REAR_LEFT])
+    lf = tuple(corners[FRONT_LEFT].tolist())
+    rf = tuple(corners[FRONT_RIGHT].tolist())
+    rb = tuple(corners[REAR_RIGHT].tolist())
+    lb = tuple(corners[REAR_LEFT].tolist())
 
     # Body edges (rear + sides) in class color
     cv2.line(frame, rb, lb, color, 2, cv2.LINE_AA)
