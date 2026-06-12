@@ -49,11 +49,12 @@ clink-tap-platform/
 ├── pyproject.toml             # Ruff linting config
 │
 ├── processing/                # Video processing pipeline
-│   ├── pipeline.py            # Orchestrates 4-stage pipeline (stabilize → detect → track → csv_postprocess)
+│   ├── pipeline.py            # Orchestrates 5-stage pipeline (stabilize → detect → track → csv_postprocess → plot)
 │   ├── stabilize.py           # ECC-based video stabilization (Kornia, GPU/MPS)
 │   ├── detect.py              # YOLOv11 OBB inference, exports detections as JSONL
 │   ├── tracking.py            # OcSort tracking with per-class isolation
 │   ├── csv_postprocess.py     # Trajectory smoothing, validation, rotation handling
+│   ├── plot.py                # OBB annotation overlay from processed.csv → annotated video
 │   ├── models/
 │   │   └── yolov11_obb.pt     # YOLOv11 OBB model (not in repo, user-provided)
 │   └── tools/
@@ -186,7 +187,7 @@ export CONTACT_RECIPIENT="support@your-domain.com"  # Optional; defaults to SMTP
 
 **Key File:** `app.py` contains all routes, the in-memory job store, and the single background worker thread.
 
-### Processing Pipeline (4 Stages)
+### Processing Pipeline (5 Stages)
 
 **File:** `processing/pipeline.py`
 
@@ -201,7 +202,9 @@ Input Video
     ↓
 [Stage 4] csv_postprocess.py → trajectory smoothing, rotation validation
     ↓
-Output: processed.csv, processed video, background.png
+[Stage 5] plot.py → OBB annotation overlay drawn from processed.csv
+    ↓
+Output: processed.csv, annotated tracked video, background.png
 ```
 
 Each stage calls `on_progress(stage_name, percent)` to update the job record in real-time. The pipeline logs are streamed to stdout with Loguru.
@@ -243,6 +246,15 @@ c = Car, t = Truck, b = Bus, h = Truck Head, g = Truck Tail, p = Pedestrian, u =
 - Escape radius check (ignore drift in parked vehicles)
 
 **Key config class:** `TrajectoryConfig` — all smoothing/validation params centralized here. See `docs/ocsort_tracking_params.md` for detailed parameter tuning.
+
+### Trajectory Plot (`plot.py`)
+
+- Reads `processed.csv` and re-renders the stabilized video frame-by-frame with OBB overlays
+- **Per-class colors** defined in `CLASS_COLORS` (car=blue, truck=orange, bus=green, …)
+- **Front edge** highlighted in red (BGR `(0,0,255)`) to show vehicle heading direction
+- **Track ID label** centered inside each bounding box with black outline for readability
+- Corner order from CSV: LF, RF, RB, LB (Left-Front, Right-Front, Right-Back, Left-Back)
+- Output is the final annotated video delivered in the download ZIP
 
 ### Download Security
 
