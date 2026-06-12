@@ -8,17 +8,17 @@ import numpy as np
 FRONT_LEFT, FRONT_RIGHT, REAR_RIGHT, REAR_LEFT = 0, 1, 2, 3
 
 CLASS_COLORS = {
-    "c": (220, 100, 30),  # car        — 藍
-    "t": (30, 140, 240),  # truck      — 橘
-    "b": (40, 200, 40),  # bus        — 綠
-    "h": (200, 60, 180),  # truck head — 紫
-    "g": (180, 120, 0),  # truck tail — 青
-    "p": (220, 220, 0),  # pedestrian — 黃
-    "u": (255, 180, 0),  # bike       — 青藍 (cyan)
-    "m": (100, 80, 255),  # motorcycle — 粉橘
+    "c": (255, 80, 0),    # car        — blue       hue 210°
+    "t": (0, 165, 255),   # truck      — orange     hue  30°
+    "b": (50, 220, 0),    # bus        — green      hue 120°
+    "h": (226, 43, 138),  # truck head — violet     hue 270°
+    "g": (255, 255, 0),   # truck tail — cyan       hue 180°
+    "p": (0, 255, 255),   # pedestrian — yellow     hue  60°
+    "u": (0, 255, 128),   # bike       — chartreuse hue  90°
+    "m": (147, 20, 255),  # motorcycle — hot pink   hue 330°
 }
 
-FRONT_HIGHLIGHT_COLOR = (0, 0, 255)  # BGR red
+FRONT_HIGHLIGHT_COLOR = (0, 0, 255)  # BGR red — marks vehicle front edge
 DEFAULT_COLOR = (255, 255, 255)
 
 
