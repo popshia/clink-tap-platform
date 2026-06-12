@@ -40,9 +40,7 @@ def _load_detections(detections_path):
 
 
 def _obb_corners(cx, cy, w, h, angle_rad):
-    return cv2.boxPoints(
-        ((cx, cy), (w, h), float(np.degrees(angle_rad)))
-    ).astype(int)
+    return cv2.boxPoints(((cx, cy), (w, h), float(np.degrees(angle_rad)))).astype(int)
 
 
 def _write_track_csv(output_csv_path, track_info):
