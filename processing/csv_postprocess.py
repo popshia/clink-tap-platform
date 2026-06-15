@@ -368,6 +368,14 @@ def process_trajectory_csv_file(input_csv, output_csv):
 
 
 if __name__ == "__main__":
+    try:
+        from logging_config import setup_logging
+
+        setup_logging()
+    except ImportError:
+        # Run by file path without the repo root on sys.path; Loguru defaults apply.
+        pass
+
     INPUT_FILE = "raw_trajectory.csv"
     OUTPUT_FILE = "fixed_trajectory.csv"
     process_trajectory_csv_file(INPUT_FILE, OUTPUT_FILE)
