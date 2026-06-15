@@ -1,3 +1,8 @@
+# Configure colorized Rich logging before anything starts emitting.
+from logging_config import setup_logging
+
+setup_logging()
+
 import base64
 import hashlib
 import hmac
@@ -14,11 +19,6 @@ import zipfile
 from flask import Flask, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
 from loguru import logger
-
-# Configure colorized Rich logging before anything starts emitting.
-from logging_config import setup_logging
-
-setup_logging()
 
 import config
 from processing.pipeline import run_pipeline
