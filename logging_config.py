@@ -18,6 +18,7 @@ import logging
 from loguru import logger
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.text import Text
 from rich.traceback import install as install_rich_traceback
 
 # Shared console (stderr, matching Loguru's default sink). Import this anywhere
@@ -25,6 +26,22 @@ from rich.traceback import install as install_rich_traceback
 console = Console(stderr=True)
 
 _configured = False
+
+
+class _AnsiRichHandler(RichHandler):
+    """RichHandler that honors ANSI escape codes already baked into a message.
+
+    Some libraries (notably Werkzeug's dev-server banner) pre-color their log
+    strings with raw ANSI sequences (``\\x1b[31m…``). With ``markup=False`` Rich
+    would strip the invisible ESC byte and print the leftover ``[31m`` codes as
+    literal text. Converting via :meth:`Text.from_ansi` turns them back into
+    real Rich styles instead.
+    """
+
+    def render_message(self, record, message):
+        if "\x1b[" in message:
+            return Text.from_ansi(message)
+        return super().render_message(record, message)
 
 
 def setup_logging(level: str = "INFO") -> None:
@@ -40,7 +57,7 @@ def setup_logging(level: str = "INFO") -> None:
     # Pretty, colorized tracebacks for uncaught exceptions too.
     install_rich_traceback(console=console, show_locals=False)
 
-    rich_handler = RichHandler(
+    rich_handler = _AnsiRichHandler(
         console=console,
         rich_tracebacks=True,
         tracebacks_show_locals=False,
