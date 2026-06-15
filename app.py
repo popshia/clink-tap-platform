@@ -15,17 +15,18 @@ from flask import Flask, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
 from loguru import logger
 
-import config
+# Configure colorized Rich logging before anything starts emitting.
 from logging_config import setup_logging
+
+setup_logging()
+
+import config
 from processing.pipeline import run_pipeline
 from services.email_service import (
     send_acknowledgment_email,
     send_contact_email,
     send_result_email,
 )
-
-# Configure colorized Rich logging before anything starts emitting.
-setup_logging()
 
 # ---------------------------------------------------------------------------
 # App setup
