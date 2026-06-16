@@ -4,7 +4,7 @@
             <h1 class="form-title" style="text-align: center">Upload Video</h1>
             <div v-if="devMode" class="dev-badge">
                 <span class="dev-badge__dot"></span>
-                Developer Mode · full-length processing
+                Developer Mode
             </div>
         </div>
 
