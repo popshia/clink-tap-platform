@@ -229,6 +229,8 @@ def upload_init():
     total_chunks = int(data.get("total_chunks", 1))
     developer = bool(data.get("developer", False))
 
+    # TODO: Dev mode verification
+
     if not email:
         return jsonify({"error": "Email address is required"}), 400
     if not filename or not allowed_file(filename):
