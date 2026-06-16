@@ -170,8 +170,22 @@ def process_job(job_id: str):
     def on_progress(stage: str, progress: int = 0):
         _update_job(job_id, stage=stage, progress=progress)
 
+    # Normal-user uploads are trimmed to the free-tier duration; developer-mode
+    # uploads (None) process the full video.
+    max_duration = (
+        None
+        if snapshot.get("developer")
+        else (config.FREE_TIER_MAX_DURATION_SECONDS or None)
+    )
+
     try:
-        output_path = run_pipeline(input_path, output_dir, job_id, on_progress)
+        output_path = run_pipeline(
+            input_path,
+            output_dir,
+            job_id,
+            on_progress,
+            max_duration_seconds=max_duration,
+        )
     except Exception as exc:
         logger.exception(f"Pipeline failed for job {job_id}")
         _update_job(job_id, status="error", error=str(exc))
@@ -213,6 +227,7 @@ def upload_init():
     filename = data.get("filename", "")
     email = data.get("email", "").strip()
     total_chunks = int(data.get("total_chunks", 1))
+    developer = bool(data.get("developer", False))
 
     if not email:
         return jsonify({"error": "Email address is required"}), 400
@@ -249,6 +264,7 @@ def upload_init():
         "received_chunks": set(),
         "chunk_dir": chunk_dir,
         "output_dir": output_dir,
+        "developer": developer,
     }
     return jsonify({"job_id": job_id}), 200
 
@@ -301,6 +317,7 @@ def upload_chunk():
             "email": upload["email"],
             "filename": upload["filename"],
             "output_filename": None,
+            "developer": upload.get("developer", False),
         }
     job_queue.put(job_id)
     threading.Thread(

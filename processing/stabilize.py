@@ -43,6 +43,7 @@ def stabilize_video(
     output_size: tuple[int, int] = (1920, 1080),
     reg_scale: float = 1.0,
     smoothing_sigma: float = 15.0,
+    max_duration_seconds: float | None = None,
     on_progress=None,
 ):
     """
@@ -70,6 +71,23 @@ def stabilize_video(
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     W, H = output_size
     reg_size = (max(1, int(W * reg_scale)), max(1, int(H * reg_scale)))
+
+    # Trim to the first N seconds (free tier): cap how many frames either pass
+    # reads/writes. Everything downstream consumes this stabilized output, so a
+    # cap here trims the whole pipeline without an extra pass over the source.
+    max_frames = None
+    if max_duration_seconds is not None and max_duration_seconds > 0:
+        max_frames = max(1, int(round(max_duration_seconds * fps)))
+
+    # Frame count used for progress; falls back to the cap when the container
+    # has no reliable frame count, and shrinks to the cap when we're trimming.
+    effective_total = total_frames
+    if max_frames is not None and (total_frames <= 0 or max_frames < total_frames):
+        effective_total = max_frames
+        logger.info(
+            f"[STABILIZE] Trimming to first {max_frames} frames "
+            f"(~{max_duration_seconds:.0f}s @ {fps:.2f} fps)"
+        )
 
     ret, first_frame = cap.read()
     if not ret:
@@ -131,6 +149,10 @@ def stabilize_video(
     last_pct = -1
 
     while True:
+        # frame_idx counts frames already accepted (frame 0 included), so once it
+        # reaches the cap we've stored exactly max_frames frames.
+        if max_frames is not None and frame_idx >= max_frames:
+            break
         ret, frame = cap.read()
         if not ret:
             break
@@ -187,14 +209,14 @@ def stabilize_video(
                 )
 
         frame_idx += 1
-        if on_progress and total_frames > 0:
+        if on_progress and effective_total > 0:
             # Pass 1 occupies 0–50% of progress; pass 2 takes 50–99%.
-            pct = min(49, int(frame_idx / total_frames * 50))
+            pct = min(49, int(frame_idx / effective_total * 50))
             if pct != last_pct:
                 on_progress(pct)
                 last_pct = pct
         if frame_idx % 100 == 0:
-            logger.info(f"ECC GPU pass 1: estimated {frame_idx}/{total_frames}")
+            logger.info(f"ECC GPU pass 1: estimated {frame_idx}/{effective_total}")
 
     cap.release()
 
@@ -210,6 +232,8 @@ def stabilize_video(
     frame_idx = 0
     last_pct = 49
     while True:
+        if max_frames is not None and frame_idx >= max_frames:
+            break
         ret, frame = cap.read()
         if not ret:
             break
@@ -235,13 +259,13 @@ def stabilize_video(
             out.write(curr_resized)
 
         frame_idx += 1
-        if on_progress and total_frames > 0:
-            pct = min(99, 50 + int(frame_idx / total_frames * 50))
+        if on_progress and effective_total > 0:
+            pct = min(99, 50 + int(frame_idx / effective_total * 50))
             if pct != last_pct:
                 on_progress(pct)
                 last_pct = pct
         if frame_idx % 100 == 0:
-            logger.info(f"ECC GPU pass 2: warped {frame_idx}/{total_frames}")
+            logger.info(f"ECC GPU pass 2: warped {frame_idx}/{effective_total}")
 
     cap.release()
     out.release()

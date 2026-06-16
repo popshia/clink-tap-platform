@@ -38,6 +38,7 @@ def run_pipeline(
     output_dir: str,
     job_id: str,
     on_progress: Optional[Callable[[str, int], None]] = None,
+    max_duration_seconds: Optional[float] = None,
 ) -> str:
     """
     Run the full video processing pipeline.
@@ -47,6 +48,9 @@ def run_pipeline(
         output_dir: Directory to store intermediate and final output files.
         job_id: Unique job identifier.
         on_progress: Optional callback(stage_name, percent) for progress updates.
+        max_duration_seconds: If set, only the first N seconds of footage are
+            processed (the stabilization stage stops reading past that point, so
+            every downstream stage is trimmed too). None processes the full video.
 
     Returns:
         Path to the final processed video.
@@ -68,6 +72,7 @@ def run_pipeline(
     stabilize_video(
         upload_video,
         stabilized_video,
+        max_duration_seconds=max_duration_seconds,
         on_progress=lambda pct: log("stabilizing", pct),
     )
     log("stabilizing", 100)
