@@ -1,7 +1,11 @@
 <template>
-    <div class="upload-form card fade-in-up">
+    <div class="upload-form card fade-in-up" :class="{ 'upload-form--dev': devMode }">
         <div class="form-header">
             <h1 class="form-title" style="text-align: center">Upload Video</h1>
+            <div v-if="devMode" class="dev-badge">
+                <span class="dev-badge__dot"></span>
+                Developer Mode · full-length processing
+            </div>
         </div>
 
         <!-- Drop zone -->
@@ -66,6 +70,12 @@
                 <ol class="drop-zone__rules">
                     <li>File size should be smaller than 10GB.</li>
                     <li>Valid file formats: .mp4, .mkv.</li>
+                    <li v-if="!devMode">
+                        Only the first 5 minutes are processed.
+                    </li>
+                    <li v-else class="drop-zone__rule--dev">
+                        Developer mode: no length limit.
+                    </li>
                 </ol>
             </div>
 
@@ -138,6 +148,12 @@ const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB
 
 export default {
     name: "UploadForm",
+    props: {
+        devMode: {
+            type: Boolean,
+            default: false,
+        },
+    },
     emits: ["job-started"],
     data() {
         return {
@@ -204,6 +220,7 @@ export default {
                         filename: file.name,
                         email: this.email.trim(),
                         total_chunks: totalChunks,
+                        developer: this.devMode,
                     }),
                 });
                 if (!initRes.ok) {
@@ -258,6 +275,15 @@ export default {
     width: 100%;
     max-width: 480px;
     padding: 36px 32px 32px;
+    transition:
+        border-color 0.25s,
+        box-shadow 0.25s;
+}
+
+/* Developer mode — accent border + glow so the active mode is obvious */
+.upload-form--dev {
+    border: 1px solid var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
 }
 
 /* Header */
@@ -270,6 +296,45 @@ export default {
     font-weight: 700;
     color: var(--text-primary);
     letter-spacing: -0.3px;
+}
+
+/* Developer-mode badge */
+.dev-badge {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+
+.dev-badge__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.35;
+    }
+}
+
+.drop-zone__rule--dev {
+    color: var(--accent);
+    font-weight: 600;
 }
 
 /* Drop zone */

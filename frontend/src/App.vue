@@ -2,6 +2,7 @@
   <div class="app-container">
     <UploadForm
       v-if="!currentJobId"
+      :devMode="devMode"
       @job-started="onJobStarted"
     />
     <JobStatus
@@ -10,9 +11,15 @@
       @reset="onReset"
     />
 
-    <!-- Footer -->
+    <!-- Footer (triple-click the logo to toggle developer mode) -->
     <div class="footer" style="position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);">
-      <img src="./assets/logo.svg" style="width: 100px; height: 60px;" alt="Logo" />
+      <img
+        src="./assets/logo.svg"
+        :class="{ 'logo--dev': devMode }"
+        style="width: 100px; height: 60px; cursor: pointer;"
+        alt="Logo"
+        @click="onLogoClick"
+      />
     </div>
 
     <!-- Contact us widget -->
@@ -31,6 +38,8 @@ export default {
   data() {
     return {
       currentJobId: null,
+      devMode: false,
+      logoClicks: [],
     }
   },
   methods: {
@@ -39,6 +48,16 @@ export default {
     },
     onReset() {
       this.currentJobId = null
+    },
+    onLogoClick() {
+      // Triple-click within 600ms toggles developer mode.
+      const now = Date.now()
+      this.logoClicks = this.logoClicks.filter((t) => now - t < 600)
+      this.logoClicks.push(now)
+      if (this.logoClicks.length >= 3) {
+        this.devMode = !this.devMode
+        this.logoClicks = []
+      }
     },
   },
 }
@@ -62,5 +81,10 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Developer mode active — subtle tint + glow on the logo */
+.logo--dev {
+  filter: drop-shadow(0 0 6px var(--accent));
 }
 </style>

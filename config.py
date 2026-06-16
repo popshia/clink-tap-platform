@@ -31,3 +31,11 @@ CONTACT_RECIPIENT = os.environ.get("CONTACT_RECIPIENT", "") or SMTP_USER
 
 # --- Allowed extensions ---
 ALLOWED_EXTENSIONS = {"mp4", "avi", "mov", "mkv", "webm"}
+
+# --- Processing limits ---
+# Uploads from non-developer ("normal user") sessions are trimmed to the first
+# N seconds of footage during stabilization. Developer-mode uploads bypass this
+# and process the full video. Set to 0 to disable trimming for everyone.
+FREE_TIER_MAX_DURATION_SECONDS = int(
+    os.environ.get("FREE_TIER_MAX_DURATION_SECONDS", str(5 * 60))
+)
