@@ -20,13 +20,21 @@ def _result_to_dets(result):
     return np.empty((0, 7), dtype=np.float32)
 
 
+def _bg_sampling_stride(total_frames, bg_max_frames):
+    if bg_max_frames is None:
+        return 1, None
+    if total_frames > 0:
+        stride = max(1, (total_frames + bg_max_frames - 1) // bg_max_frames)
+        return stride, bg_max_frames
+    return 1, bg_max_frames
+
+
 def export_background_and_detection_as_jsonl(
     input_video_path,
     model_path,
     detections_path,
     background_path,
-    frame_stride=1,
-    max_frames=None,
+    bg_max_frames=1000,
     on_progress=None,
 ):
     model = YOLO(model_path)
@@ -38,6 +46,7 @@ def export_background_and_detection_as_jsonl(
 
     cap = cv2.VideoCapture(input_video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    bg_stride, bg_cap = _bg_sampling_stride(total_frames, bg_max_frames)
     frame_index = 0
     last_pct = -1
     bg_frames = []
@@ -48,8 +57,8 @@ def export_background_and_detection_as_jsonl(
             if not success:
                 break
 
-            if frame_index % frame_stride == 0:
-                if max_frames is None or len(bg_frames) < max_frames:
+            if frame_index % bg_stride == 0:
+                if bg_cap is None or len(bg_frames) < bg_cap:
                     bg_frames.append(frame.copy())
 
             result = model.predict(frame, device=device, verbose=False)[0]
