@@ -3,7 +3,6 @@ import math
 
 import numpy as np
 from loguru import logger
-from tqdm import tqdm
 
 
 class TrajectoryConfig:
@@ -350,7 +349,7 @@ def process_trajectory_csv_file(input_csv, output_csv):
         reader = csv.reader(f)
         lines = list(reader)
 
-    for index, row in enumerate(tqdm(lines, desc="處理進度", unit="台")):
+    for index, row in enumerate(lines):
         try:
             row = [item for item in row if item.strip() != ""]
             if len(row) < 6:
@@ -358,7 +357,7 @@ def process_trajectory_csv_file(input_csv, output_csv):
             new_row = process_single_vehicle(row, config)
             processed_rows.append(new_row)
         except Exception as e:
-            tqdm.write(f"處理第 {index} 筆資料 (ID: {row[0]}) 時發生錯誤: {e}")
+            logger.warning(f"處理第 {index} 筆資料 (ID: {row[0]}) 時發生錯誤: {e}")
 
     logger.info("處理完成，正在匯出資料...")
     with open(output_csv, "w", newline="", encoding="utf-8") as f:
@@ -368,14 +367,6 @@ def process_trajectory_csv_file(input_csv, output_csv):
 
 
 if __name__ == "__main__":
-    try:
-        from logging_config import setup_logging
-
-        setup_logging()
-    except ImportError:
-        # Run by file path without the repo root on sys.path; Loguru defaults apply.
-        pass
-
     INPUT_FILE = "raw_trajectory.csv"
     OUTPUT_FILE = "fixed_trajectory.csv"
     process_trajectory_csv_file(INPUT_FILE, OUTPUT_FILE)
