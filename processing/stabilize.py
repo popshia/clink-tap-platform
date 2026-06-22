@@ -273,14 +273,6 @@ def stabilize_video(
 
 
 if __name__ == "__main__":
-    try:
-        from logging_config import setup_logging
-
-        setup_logging()
-    except ImportError:
-        # Run by file path without the repo root on sys.path; Loguru defaults apply.
-        pass
-
     parser = argparse.ArgumentParser()
     parser.add_argument("input_file")
     parser.add_argument("output_file")
