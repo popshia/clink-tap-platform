@@ -124,8 +124,9 @@ def send_acknowledgment_email(to_email: str, job_id: str):
     """Send an HTML email confirming that the video upload was received and is being processed."""
 
     if not config.SMTP_USER or not config.SMTP_PASSWORD:
+        safe_email = to_email.replace("\r", "").replace("\n", "")
         logger.warning(
-            f"[EMAIL] SMTP credentials not set. Skipping acknowledgment email to {to_email}"
+            f"[EMAIL] SMTP credentials not set. Skipping acknowledgment email to {safe_email}"
         )
         return
 
@@ -170,8 +171,17 @@ def send_contact_email(name: str, email: str, phone: str, subject: str, message:
 
     recipient = config.CONTACT_RECIPIENT
     if not config.SMTP_USER or not config.SMTP_PASSWORD or not recipient:
-        logger.warning(f"[CONTACT] SMTP not configured. Skipping contact email from {email}")
-        logger.info(f"[CONTACT] {name} <{email}> ({phone}) — {subject}: {message}")
+        safe_email = email.replace("\r", "").replace("\n", "")
+        safe_name = name.replace("\r", "").replace("\n", "")
+        safe_phone = phone.replace("\r", "").replace("\n", "")
+        safe_subject = subject.replace("\r", "").replace("\n", "")
+        safe_message = message.replace("\r", "\\r").replace("\n", "\\n")
+        logger.warning(
+            f"[CONTACT] SMTP not configured. Skipping contact email from {safe_email}"
+        )
+        logger.info(
+            f"[CONTACT] {safe_name} <{safe_email}> ({safe_phone}) — {safe_subject}: {safe_message}"
+        )
         return
 
     mail_subject = f"[Contact Us] {subject}" if subject else "[Contact Us] New message"
