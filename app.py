@@ -232,24 +232,14 @@ def upload_init():
     if not filename or not allowed_file(filename):
         return jsonify({"error": "Invalid or unsupported video file"}), 400
 
-    # 12 hex chars (~2^48 IDs) makes collisions astronomically unlikely; the
-    # exist_ok=False makedirs on output_dir + retry below makes a collision a
-    # loud failure rather than silent data corruption between two uploads.
-    # Creating output_dir (not just chunk_dir) is what guarantees uniqueness:
-    # after finalize we rmtree the _chunks subdir but leave the processed files
-    # in output_dir, so an existing output_dir is the real collision signal.
-    for _ in range(10):
-        job_id = uuid.uuid4().hex[:12]
-        output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
-        chunk_dir = os.path.join(output_dir, "_chunks")
-        try:
-            os.makedirs(output_dir, exist_ok=False)
-            os.makedirs(chunk_dir, exist_ok=False)
-            break
-        except FileExistsError:
-            continue
-    else:
-        return jsonify({"error": "Failed to allocate job ID"}), 500
+    # 12 hex chars = 48 random bits; a collision won't happen. exist_ok=False on
+    # output_dir still makes the impossible case a loud 500 rather than silently
+    # writing into a finalized job's dir (we leave output_dir after finalize).
+    job_id = uuid.uuid4().hex[:12]
+    output_dir = os.path.join(config.PROCESSED_FOLDER, job_id)
+    chunk_dir = os.path.join(output_dir, "_chunks")
+    os.makedirs(output_dir, exist_ok=False)
+    os.makedirs(chunk_dir)
 
     ext = filename.rsplit(".", 1)[1].lower()
     base = filename.rsplit(".", 1)[0]
