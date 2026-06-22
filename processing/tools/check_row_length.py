@@ -15,12 +15,7 @@ import argparse
 import io
 import sys
 
-from rich.console import Console
-
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-
-# file=None → Console reads sys.stdout dynamically, picking up the utf-8 wrapper.
-console = Console()
 
 FIXED_COLS = 6
 COORDS_PER_FRAME = 8
@@ -89,29 +84,24 @@ def main():
     parser.add_argument("-o", "--output", help="將結果輸出到指定檔案 (UTF-8)")
     args = parser.parse_args()
 
-    console.print(f"檢查檔案：{args.filepath}", style="cyan", markup=False)
+    print(f"檢查檔案：{args.filepath}")
     errors = check_file(args.filepath, args.encoding)
 
-    # `lines` is the plain-text report written to --output; the console gets a
-    # colorized copy. markup=False so bracketed tags like [OK]/[FAIL] and any
-    # brackets inside error messages are printed literally, not parsed as markup.
     lines = []
     if not errors:
         lines.append("[OK] 全部行長度正確")
-        console.print(lines[-1], style="bold green", markup=False)
     else:
-        header = f"[FAIL] 發現 {len(errors)} 個問題："
-        lines.append(header)
-        console.print(header, style="bold red", markup=False)
+        lines.append(f"[FAIL] 發現 {len(errors)} 個問題：")
         for msg in errors:
-            line = f"  {msg}"
-            lines.append(line)
-            console.print(line, style="yellow", markup=False)
+            lines.append(f"  {msg}")
+
+    for line in lines:
+        print(line)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
-        console.print(f"報告已寫入：{args.output}", style="cyan", markup=False)
+        print(f"報告已寫入：{args.output}")
 
     sys.exit(0 if not errors else 1)
 

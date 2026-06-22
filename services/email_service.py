@@ -2,8 +2,6 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from loguru import logger
-
 import config
 
 
@@ -11,8 +9,8 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
     """Send an HTML email with the processed video download link via Gmail SMTP."""
 
     if not config.SMTP_USER or not config.SMTP_PASSWORD:
-        logger.warning(f"[EMAIL] SMTP credentials not set. Skipping email to {to_email}")
-        logger.info(f"[EMAIL] Download link would be: {download_url}")
+        print(f"[EMAIL] SMTP credentials not set. Skipping email to {to_email}")
+        print(f"[EMAIL] Download link would be: {download_url}")
         return
 
     subject = f"Your Results Are Ready — Job {job_id}"
@@ -92,16 +90,16 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
             server.ehlo()
             server.login(config.SMTP_USER, config.SMTP_PASSWORD)
             server.sendmail(config.SMTP_USER, to_email, msg.as_string())
-        logger.info(f"[EMAIL] Sent result email to {to_email}")
+        print(f"[EMAIL] Sent result email to {to_email}")
     except Exception as exc:
-        logger.error(f"[EMAIL] Failed to send result email to {to_email}: {exc}")
+        print(f"[EMAIL] Failed to send result email to {to_email}: {exc}")
 
 
 def send_acknowledgment_email(to_email: str, job_id: str):
     """Send an HTML email confirming that the video upload was received and is being processed."""
 
     if not config.SMTP_USER or not config.SMTP_PASSWORD:
-        logger.warning(
+        print(
             f"[EMAIL] SMTP credentials not set. Skipping acknowledgment email to {to_email}"
         )
         return
@@ -171,9 +169,9 @@ def send_acknowledgment_email(to_email: str, job_id: str):
             server.ehlo()
             server.login(config.SMTP_USER, config.SMTP_PASSWORD)
             server.sendmail(config.SMTP_USER, to_email, msg.as_string())
-        logger.info(f"[EMAIL] Sent acknowledgment email to {to_email}")
+        print(f"[EMAIL] Sent acknowledgment email to {to_email}")
     except Exception as exc:
-        logger.error(f"[EMAIL] Failed to send acknowledgment email to {to_email}: {exc}")
+        print(f"[EMAIL] Failed to send acknowledgment email to {to_email}: {exc}")
 
 
 def send_contact_email(name: str, email: str, phone: str, subject: str, message: str):
@@ -181,10 +179,8 @@ def send_contact_email(name: str, email: str, phone: str, subject: str, message:
 
     recipient = config.CONTACT_RECIPIENT
     if not config.SMTP_USER or not config.SMTP_PASSWORD or not recipient:
-        logger.warning(
-            f"[CONTACT] SMTP not configured. Skipping contact email from {email}"
-        )
-        logger.info(f"[CONTACT] {name} <{email}> ({phone}) — {subject}: {message}")
+        print(f"[CONTACT] SMTP not configured. Skipping contact email from {email}")
+        print(f"[CONTACT] {name} <{email}> ({phone}) — {subject}: {message}")
         return
 
     mail_subject = f"[Contact Us] {subject}" if subject else "[Contact Us] New message"
@@ -237,6 +233,6 @@ def send_contact_email(name: str, email: str, phone: str, subject: str, message:
             server.ehlo()
             server.login(config.SMTP_USER, config.SMTP_PASSWORD)
             server.sendmail(config.SMTP_USER, recipient, msg.as_string())
-        logger.info(f"[CONTACT] Forwarded contact message from {email} to {recipient}")
+        print(f"[CONTACT] Forwarded contact message from {email} to {recipient}")
     except Exception as exc:
-        logger.error(f"[CONTACT] Failed to forward contact message from {email}: {exc}")
+        print(f"[CONTACT] Failed to forward contact message from {email}: {exc}")
