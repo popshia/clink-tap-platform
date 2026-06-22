@@ -132,7 +132,7 @@ def send_acknowledgment_email(to_email: str, job_id: str):
     subject = f"We've Received Your Video — Job {job_id}"
 
     html_body = _wrap_html(
-        f"""\
+        """\
             <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:20px;font-weight:600;">We've received your video.</h2>
             <p style="margin:0 0 16px;color:#555555;font-size:14px;line-height:1.8;">
               Your upload has been received and your video is now being analyzed. This process may take some time depending on the length and complexity of the footage.
