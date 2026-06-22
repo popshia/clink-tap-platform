@@ -120,7 +120,7 @@ def run_pipeline(
     log("plotting", 100)
 
     elapsed = time.perf_counter() - start
-    logger.info(f"Processing time: {format_duration(elapsed)}")
+    logger.info(f"[PIPELINE] {job_id} | Processing time: {format_duration(elapsed)}")
 
     # Clean up input and intermediate files (keep only the final output)
     for intermediate in [
