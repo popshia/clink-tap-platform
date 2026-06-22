@@ -7,6 +7,20 @@ from loguru import logger
 import config
 
 
+def _send(msg: MIMEMultipart, recipient: str, description: str) -> None:
+    """Open a STARTTLS SMTP session, send msg to recipient, and log the outcome."""
+    try:
+        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+            server.sendmail(config.SMTP_USER, recipient, msg.as_string())
+        logger.info(f"[EMAIL] Sent {description} to {recipient}")
+    except Exception as exc:
+        logger.error(f"[EMAIL] Failed to send {description} to {recipient}: {exc}")
+
+
 def send_result_email(to_email: str, download_url: str, job_id: str):
     """Send an HTML email with the processed video download link via Gmail SMTP."""
 
@@ -85,16 +99,7 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
-    try:
-        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-            server.sendmail(config.SMTP_USER, to_email, msg.as_string())
-        logger.info(f"[EMAIL] Sent result email to {to_email}")
-    except Exception as exc:
-        logger.error(f"[EMAIL] Failed to send result email to {to_email}: {exc}")
+    _send(msg, to_email, "result email")
 
 
 def send_acknowledgment_email(to_email: str, job_id: str):
@@ -164,16 +169,7 @@ def send_acknowledgment_email(to_email: str, job_id: str):
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
-    try:
-        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-            server.sendmail(config.SMTP_USER, to_email, msg.as_string())
-        logger.info(f"[EMAIL] Sent acknowledgment email to {to_email}")
-    except Exception as exc:
-        logger.error(f"[EMAIL] Failed to send acknowledgment email to {to_email}: {exc}")
+    _send(msg, to_email, "acknowledgment email")
 
 
 def send_contact_email(name: str, email: str, phone: str, subject: str, message: str):
@@ -230,13 +226,4 @@ def send_contact_email(name: str, email: str, phone: str, subject: str, message:
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
-    try:
-        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-            server.sendmail(config.SMTP_USER, recipient, msg.as_string())
-        logger.info(f"[CONTACT] Forwarded contact message from {email} to {recipient}")
-    except Exception as exc:
-        logger.error(f"[CONTACT] Failed to forward contact message from {email}: {exc}")
+    _send(msg, recipient, f"contact message from {email}")
