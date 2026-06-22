@@ -2,6 +2,7 @@
 Processing Pipeline – orchestrates stabilization → detection → tracking → plot.
 """
 
+import datetime
 import os
 import time
 from typing import Callable, Optional
@@ -14,23 +15,6 @@ from processing.detect import export_background_and_detection_as_jsonl
 from processing.plot import plot_trajectory_video
 from processing.stabilize import stabilize_video
 from processing.tracking import track_from_detection_jsonl
-
-# from processing.track import track_and_output_csv
-
-
-def format_duration(seconds: float) -> str:
-    seconds = int(seconds)
-    hours, remainder = divmod(seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    parts = []
-
-    if hours:
-        parts.append(f"{hours}h")
-    if minutes:
-        parts.append(f"{minutes}min")
-
-    parts.append(f"{seconds}sec")
-    return " ".join(parts)
 
 
 def run_pipeline(
@@ -120,7 +104,9 @@ def run_pipeline(
     log("plotting", 100)
 
     elapsed = time.perf_counter() - start
-    logger.info(f"[PIPELINE] {job_id} | Processing time: {format_duration(elapsed)}")
+    logger.info(
+        f"[PIPELINE] {job_id} | Processing time: {str(datetime.timedelta(seconds=int(elapsed)))}"
+    )
 
     # Clean up input and intermediate files (keep only the final output)
     for intermediate in [

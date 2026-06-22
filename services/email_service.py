@@ -2,15 +2,34 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+from loguru import logger
+
 import config
+
+
+def _send(msg: MIMEMultipart, recipient: str, description: str) -> None:
+    """Open a STARTTLS SMTP session, send msg to recipient, and log the outcome."""
+    try:
+        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+            server.sendmail(config.SMTP_USER, recipient, msg.as_string())
+        logger.info(f"[EMAIL] Sent {description} to {recipient}")
+    except Exception as exc:
+        logger.error(f"[EMAIL] Failed to send {description} to {recipient}: {exc}")
+        raise
 
 
 def send_result_email(to_email: str, download_url: str, job_id: str):
     """Send an HTML email with the processed video download link via Gmail SMTP."""
 
     if not config.SMTP_USER or not config.SMTP_PASSWORD:
-        print(f"[EMAIL] SMTP credentials not set. Skipping email to {to_email}")
-        print(f"[EMAIL] Download link would be: {download_url}")
+        logger.warning(
+            f"[EMAIL] SMTP credentials not set. Skipping email to {to_email}"
+        )
+        logger.info(f"[EMAIL] Download link would be: {download_url}")
         return
 
     subject = f"Your Results Are Ready — Job {job_id}"
@@ -83,16 +102,7 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
-    try:
-        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-            server.sendmail(config.SMTP_USER, to_email, msg.as_string())
-        print(f"[EMAIL] Sent result email to {to_email}")
-    except Exception as exc:
-        print(f"[EMAIL] Failed to send result email to {to_email}: {exc}")
+    _send(msg, to_email, "result email")
 
 
 def send_acknowledgment_email(to_email: str, job_id: str):
@@ -162,16 +172,7 @@ def send_acknowledgment_email(to_email: str, job_id: str):
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
-    try:
-        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-            server.sendmail(config.SMTP_USER, to_email, msg.as_string())
-        print(f"[EMAIL] Sent acknowledgment email to {to_email}")
-    except Exception as exc:
-        print(f"[EMAIL] Failed to send acknowledgment email to {to_email}: {exc}")
+    _send(msg, to_email, "acknowledgment email")
 
 
 def send_contact_email(name: str, email: str, phone: str, subject: str, message: str):
@@ -226,13 +227,4 @@ def send_contact_email(name: str, email: str, phone: str, subject: str, message:
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
-    try:
-        with smtplib.SMTP(config.SMTP_SERVER, config.SMTP_PORT, timeout=10) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-            server.sendmail(config.SMTP_USER, recipient, msg.as_string())
-        print(f"[CONTACT] Forwarded contact message from {email} to {recipient}")
-    except Exception as exc:
-        print(f"[CONTACT] Failed to forward contact message from {email}: {exc}")
+    _send(msg, recipient, f"contact message from {email}")
