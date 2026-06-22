@@ -81,7 +81,6 @@ def run_pipeline(
     track_from_detection_jsonl(
         stabilized_video,
         detections,
-        # plotted_video,
         raw_csv,
         on_progress=lambda pct: log("tracking", pct),
     )

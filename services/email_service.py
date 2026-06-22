@@ -22,19 +22,9 @@ def _send(msg: MIMEMultipart, recipient: str, description: str) -> None:
         raise
 
 
-def send_result_email(to_email: str, download_url: str, job_id: str):
-    """Send an HTML email with the processed video download link via Gmail SMTP."""
-
-    if not config.SMTP_USER or not config.SMTP_PASSWORD:
-        logger.warning(
-            f"[EMAIL] SMTP credentials not set. Skipping email to {to_email}"
-        )
-        logger.info(f"[EMAIL] Download link would be: {download_url}")
-        return
-
-    subject = f"Your Results Are Ready — Job {job_id}"
-
-    html_body = f"""\
+def _wrap_html(inner_html: str, footer_text: str) -> str:
+    """Wrap an email body block in the shared C-LINK header/card/footer chrome."""
+    return f"""\
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -49,6 +39,42 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
         </tr>
         <tr>
           <td style="padding:40px;">
+{inner_html}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px;border-top:1px solid #e8e8e8;background:#fafafa;">
+            <p style="margin:0;color:#aaaaaa;font-size:11px;line-height:1.6;">
+              {footer_text}
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+
+_AUTOMATED_FOOTER = (
+    "This is an automated notification. Please do not reply to this email."
+)
+
+
+def send_result_email(to_email: str, download_url: str, job_id: str):
+    """Send an HTML email with the processed video download link via Gmail SMTP."""
+
+    if not config.SMTP_USER or not config.SMTP_PASSWORD:
+        logger.warning(
+            f"[EMAIL] SMTP credentials not set. Skipping email to {to_email}"
+        )
+        logger.info(f"[EMAIL] Download link would be: {download_url}")
+        return
+
+    subject = f"Your Results Are Ready — Job {job_id}"
+
+    html_body = _wrap_html(
+        f"""\
             <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:20px;font-weight:600;">Your results are ready for download.</h2>
             <p style="margin:0 0 32px;color:#555555;font-size:14px;line-height:1.8;">
               Your video has been processed successfully. The download package includes the stabilized video, vehicle tracking data (CSV), and background reference image.
@@ -69,21 +95,9 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
             </p>
             <p style="margin:0;color:#555555;font-size:14px;line-height:1.8;">
               Thank you for using C-LINK TAP Platform. We hope the results meet your expectations.
-            </p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:20px 40px;border-top:1px solid #e8e8e8;background:#fafafa;">
-            <p style="margin:0;color:#aaaaaa;font-size:11px;line-height:1.6;">
-              Job ID: {job_id} &nbsp;|&nbsp; This is an automated notification. Please do not reply to this email.
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>"""
+            </p>""",
+        f"Job ID: {job_id} &nbsp;|&nbsp; {_AUTOMATED_FOOTER}",
+    )
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -109,28 +123,15 @@ def send_acknowledgment_email(to_email: str, job_id: str):
     """Send an HTML email confirming that the video upload was received and is being processed."""
 
     if not config.SMTP_USER or not config.SMTP_PASSWORD:
-        print(
+        logger.warning(
             f"[EMAIL] SMTP credentials not set. Skipping acknowledgment email to {to_email}"
         )
         return
 
     subject = f"We've Received Your Video — Job {job_id}"
 
-    html_body = f"""\
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 0;">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e0e0e0;">
-        <tr>
-          <td style="background:#4a6572;padding:28px 40px;">
-            <span style="color:#ffffff;font-size:18px;font-weight:bold;letter-spacing:0.5px;">C-LINK TAP Platform</span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:40px;">
+    html_body = _wrap_html(
+        f"""\
             <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:20px;font-weight:600;">We've received your video.</h2>
             <p style="margin:0 0 16px;color:#555555;font-size:14px;line-height:1.8;">
               Your upload has been received and your video is now being analyzed. This process may take some time depending on the length and complexity of the footage.
@@ -140,21 +141,9 @@ def send_acknowledgment_email(to_email: str, job_id: str):
             </p>
             <p style="margin:0;color:#555555;font-size:14px;line-height:1.8;">
               Thank you for choosing C-LINK TAP Platform. We appreciate your trust in our platform.
-            </p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:20px 40px;border-top:1px solid #e8e8e8;background:#fafafa;">
-            <p style="margin:0;color:#aaaaaa;font-size:11px;line-height:1.6;">
-              Job ID: {job_id} &nbsp;|&nbsp; This is an automated notification. Please do not reply to this email.
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>"""
+            </p>""",
+        f"Job ID: {job_id} &nbsp;|&nbsp; {_AUTOMATED_FOOTER}",
+    )
 
     text_body = (
         f"We've received your video.\n\n"
@@ -180,8 +169,8 @@ def send_contact_email(name: str, email: str, phone: str, subject: str, message:
 
     recipient = config.CONTACT_RECIPIENT
     if not config.SMTP_USER or not config.SMTP_PASSWORD or not recipient:
-        print(f"[CONTACT] SMTP not configured. Skipping contact email from {email}")
-        print(f"[CONTACT] {name} <{email}> ({phone}) — {subject}: {message}")
+        logger.warning(f"[CONTACT] SMTP not configured. Skipping contact email from {email}")
+        logger.info(f"[CONTACT] {name} <{email}> ({phone}) — {subject}: {message}")
         return
 
     mail_subject = f"[Contact Us] {subject}" if subject else "[Contact Us] New message"
@@ -194,20 +183,21 @@ def send_contact_email(name: str, email: str, phone: str, subject: str, message:
             .replace(">", "&gt;")
         )
 
-    html_body = f"""\
-    <html>
-    <body style="font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a1a; padding: 24px;">
-      <h2 style="color: #6b8fa3; margin-top: 0;">New Contact Us message</h2>
-      <table style="border-collapse: collapse; font-size: 14px;">
-        <tr><td style="padding: 4px 12px 4px 0; color: #555;"><b>Name</b></td><td>{esc(name)}</td></tr>
-        <tr><td style="padding: 4px 12px 4px 0; color: #555;"><b>Email</b></td><td>{esc(email)}</td></tr>
-        <tr><td style="padding: 4px 12px 4px 0; color: #555;"><b>Phone</b></td><td>{esc(phone)}</td></tr>
-        <tr><td style="padding: 4px 12px 4px 0; color: #555;"><b>Subject</b></td><td>{esc(subject)}</td></tr>
-      </table>
-      <p style="margin-top: 16px; line-height: 1.6; white-space: pre-wrap;">{esc(message)}</p>
-    </body>
-    </html>
-    """
+    html_body = _wrap_html(
+        f"""\
+            <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:20px;font-weight:600;">New Contact Us message</h2>
+            <p style="margin:0 0 24px;color:#555555;font-size:14px;line-height:1.8;">
+              A new message was submitted through the contact form. The sender's details are below.
+            </p>
+            <table cellpadding="0" cellspacing="0" style="margin:0 0 24px;font-size:14px;line-height:1.8;">
+              <tr><td style="padding:2px 16px 2px 0;color:#888888;white-space:nowrap;">Name</td><td style="color:#1a1a1a;">{esc(name)}</td></tr>
+              <tr><td style="padding:2px 16px 2px 0;color:#888888;white-space:nowrap;">Email</td><td style="color:#1a1a1a;">{esc(email)}</td></tr>
+              <tr><td style="padding:2px 16px 2px 0;color:#888888;white-space:nowrap;">Phone</td><td style="color:#1a1a1a;">{esc(phone)}</td></tr>
+              <tr><td style="padding:2px 16px 2px 0;color:#888888;white-space:nowrap;">Subject</td><td style="color:#1a1a1a;">{esc(subject)}</td></tr>
+            </table>
+            <p style="margin:0;padding:14px 16px;background:#f5f7f8;border-left:3px solid #4a6572;color:#555555;font-size:14px;line-height:1.8;white-space:pre-wrap;">{esc(message)}</p>""",
+        "Sent via the C-LINK TAP Platform contact form. Reply to this email to respond to the sender.",
+    )
 
     text_body = (
         f"New Contact Us message\n\n"
