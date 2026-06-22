@@ -24,8 +24,10 @@ def send_result_email(to_email: str, download_url: str, job_id: str):
     """Send an HTML email with the processed video download link via Gmail SMTP."""
 
     if not config.SMTP_USER or not config.SMTP_PASSWORD:
-        print(f"[EMAIL] SMTP credentials not set. Skipping email to {to_email}")
-        print(f"[EMAIL] Download link would be: {download_url}")
+        logger.warning(
+            f"[EMAIL] SMTP credentials not set. Skipping email to {to_email}"
+        )
+        logger.info(f"[EMAIL] Download link would be: {download_url}")
         return
 
     subject = f"Your Results Are Ready — Job {job_id}"
