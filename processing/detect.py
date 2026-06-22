@@ -23,6 +23,8 @@ def _result_to_dets(result):
 def _bg_sampling_stride(total_frames, bg_max_frames):
     if bg_max_frames is None:
         return 1, None
+    if bg_max_frames <= 0:
+        raise ValueError("bg_max_frames must be a positive integer or None")
     if total_frames > 0:
         stride = max(1, (total_frames + bg_max_frames - 1) // bg_max_frames)
         return stride, bg_max_frames
@@ -34,7 +36,7 @@ def export_background_and_detection_as_jsonl(
     model_path,
     detections_path,
     background_path,
-    bg_max_frames=1000,
+    bg_max_frames=500,
     on_progress=None,
 ):
     model = YOLO(model_path)

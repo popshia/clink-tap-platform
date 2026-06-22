@@ -99,8 +99,11 @@ def _draw_vehicle(frame, vehicle):
     cv2.line(frame, lb, lf, color, 2, cv2.LINE_AA)
     cv2.line(frame, rf, rb, color, 2, cv2.LINE_AA)
 
-    # Front edge highlighted in red
-    cv2.line(frame, lf, rf, FRONT_HIGHLIGHT_COLOR, 4, cv2.LINE_AA)
+    # Front edge highlighted in red (pedestrians have no vehicle front)
+    if cls_idx == "p":
+        cv2.line(frame, lf, rf, color, 2, cv2.LINE_AA)
+    else:
+        cv2.line(frame, lf, rf, FRONT_HIGHLIGHT_COLOR, 4, cv2.LINE_AA)
 
     center = corners.mean(axis=0)
     _draw_centered_label(frame, f"{cls_idx} {track_id}", center, color)
