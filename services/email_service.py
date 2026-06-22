@@ -17,6 +17,7 @@ def _send(msg: MIMEMultipart, recipient: str, description: str) -> None:
         logger.info(f"[EMAIL] Sent {description} to {recipient}")
     except Exception as exc:
         logger.error(f"[EMAIL] Failed to send {description} to {recipient}: {exc}")
+        raise
 
 
 def send_result_email(to_email: str, download_url: str, job_id: str):
