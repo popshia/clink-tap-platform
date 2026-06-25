@@ -5,18 +5,22 @@
       :devMode="devMode"
       @job-started="onJobStarted"
     />
-    <JobStatus
-      v-else
-      :jobId="currentJobId"
-      @reset="onReset"
-    />
+    <JobStatus v-else :jobId="currentJobId" @reset="onReset" />
 
     <!-- Footer (triple-click the logo to toggle developer mode) -->
-    <div class="footer" style="position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);">
+    <div
+      class="footer"
+      style="
+        position: fixed;
+        bottom: 32px;
+        left: 50%;
+        transform: translateX(-50%);
+      "
+    >
       <img
         src="./assets/logo.svg"
         :class="{ 'logo--dev': devMode }"
-        style="width: 100px; height: 60px; cursor: pointer;"
+        style="width: 100px; height: 60px; cursor: pointer"
         alt="Logo"
         @click="onLogoClick"
       />
@@ -26,7 +30,7 @@
     <ContactWidget />
 
     <!-- Build commit pill — hover reveals the latest commit message -->
-    <div class="commit-pill">
+    <div v-if="commitDate" class="commit-pill">
       v{{ commitDate }}
       <span class="commit-pill__log">{{ commitLog }}</span>
     </div>
@@ -34,12 +38,12 @@
 </template>
 
 <script>
-import UploadForm from './components/UploadForm.vue'
-import JobStatus from './components/JobStatus.vue'
-import ContactWidget from './components/ContactWidget.vue'
+import UploadForm from "./components/UploadForm.vue";
+import JobStatus from "./components/JobStatus.vue";
+import ContactWidget from "./components/ContactWidget.vue";
 
 export default {
-  name: 'App',
+  name: "App",
   components: { UploadForm, JobStatus, ContactWidget },
   data() {
     return {
@@ -48,27 +52,27 @@ export default {
       logoClicks: [],
       commitDate: __COMMIT_DATE__,
       commitLog: __COMMIT_LOG__,
-    }
+    };
   },
   methods: {
     onJobStarted(jobId) {
-      this.currentJobId = jobId
+      this.currentJobId = jobId;
     },
     onReset() {
-      this.currentJobId = null
+      this.currentJobId = null;
     },
     onLogoClick() {
       // Triple-click within 600ms toggles developer mode.
-      const now = Date.now()
-      this.logoClicks = this.logoClicks.filter((t) => now - t < 600)
-      this.logoClicks.push(now)
+      const now = Date.now();
+      this.logoClicks = this.logoClicks.filter((t) => now - t < 600);
+      this.logoClicks.push(now);
       if (this.logoClicks.length >= 3) {
-        this.devMode = !this.devMode
-        this.logoClicks = []
+        this.devMode = !this.devMode;
+        this.logoClicks = [];
       }
     },
   },
-}
+};
 </script>
 
 <style scoped>

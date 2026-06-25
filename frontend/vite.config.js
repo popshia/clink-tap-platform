@@ -2,12 +2,20 @@ import { execSync } from "node:child_process";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 
-const git = (fmt) =>
-  execSync(
-    `git log -1 --oneline -E --format=${fmt} --date=short --grep='^(feat|fix|refactor)'`,
-  )
-    .toString()
-    .trim();
+const git = (fmt) => {
+  try {
+    return execSync(
+      "git log -1 --oneline -E --format=" +
+        fmt +
+        " --date=short --grep='^(feat|fix|refactor)'",
+      { stdio: ["ignore", "pipe", "ignore"] },
+    )
+      .toString()
+      .trim();
+  } catch (e) {
+    return "";
+  }
+};
 
 export default defineConfig({
   define: {
