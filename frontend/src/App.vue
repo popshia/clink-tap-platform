@@ -24,6 +24,12 @@
 
     <!-- Contact us widget -->
     <ContactWidget />
+
+    <!-- Build commit pill — hover reveals the latest commit message -->
+    <div class="commit-pill">
+      v{{ commitDate }}
+      <span class="commit-pill__log">{{ commitLog }}</span>
+    </div>
   </div>
 </template>
 
@@ -40,6 +46,8 @@ export default {
       currentJobId: null,
       devMode: false,
       logoClicks: [],
+      commitDate: __COMMIT_DATE__,
+      commitLog: __COMMIT_LOG__,
     }
   },
   methods: {
@@ -86,5 +94,44 @@ export default {
 /* Developer mode active — subtle tint + glow on the logo */
 .logo--dev {
   filter: drop-shadow(0 0 6px var(--accent));
+}
+
+/* Build commit pill — fixed bottom-left, hover reveals the changelog */
+.commit-pill {
+  position: fixed;
+  bottom: 20px;
+  left: 16px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: default;
+}
+
+.commit-pill__log {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: max-content;
+  max-width: 320px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--text-primary);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+.commit-pill:hover .commit-pill__log {
+  opacity: 1;
+  visibility: visible;
 }
 </style>
