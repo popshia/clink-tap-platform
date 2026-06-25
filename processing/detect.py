@@ -42,20 +42,32 @@ def _background_from_samples(samples):
     samples: [(frame, dets), ...]，dets 格式同 detections.jsonl。
     若某 pixel 在所有取樣影格都被車擋住，退回 naive median（極端情況降級）。
     """
-    frames = np.stack([frame for frame, _ in samples], axis=0).astype(np.float32)
+    # uint8 stack：避免整批轉 float32（200 幀 1080p 約省 3.5 GB）
+    frames = np.stack([frame for frame, _ in samples], axis=0)
     h, w = frames.shape[1:3]
     masks = np.stack(
         [_vehicle_mask_from_dets(dets, h, w) for _, dets in samples], axis=0
     )
 
-    masked = np.where(masks[..., np.newaxis], frames, np.nan)
-    bg = np.nanmedian(masked, axis=0)
+    # 垂直分塊算 median，峰值暫存從整張 ~4.6 GB 降到每塊 ~440 MB（chunk=100）
+    bg = np.zeros((h, w, 3), dtype=np.uint8)
+    chunk_size = 100
+    for y in range(0, h, chunk_size):
+        y_end = min(y + chunk_size, h)
+        chunk_frames = frames[:, y:y_end].astype(np.float32)
+        chunk_masks = masks[:, y:y_end, :, np.newaxis]
 
-    # 永遠被擋的 pixel：nanmedian 無樣本，用未遮罩 median 填補
-    holes = np.isnan(bg[..., 0])
-    if holes.any():
-        bg[holes] = np.median(frames, axis=0)[holes]
-    return bg.astype(np.uint8)
+        masked = np.where(chunk_masks, chunk_frames, np.nan)
+        chunk_bg = np.nanmedian(masked, axis=0)
+
+        # 永遠被擋的 pixel：nanmedian 無樣本，用未遮罩 median 填補
+        holes = np.isnan(chunk_bg[..., 0])
+        if holes.any():
+            chunk_bg[holes] = np.median(chunk_frames, axis=0)[holes]
+
+        bg[y:y_end] = chunk_bg.astype(np.uint8)
+
+    return bg
 
 
 def _bg_sampling_stride(total_frames, bg_max_frames):
