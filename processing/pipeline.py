@@ -89,7 +89,11 @@ def run_pipeline(
     # ── Stage 4: CSV post-processing ──
     processed_csv = os.path.join(output_dir, "processed.csv")
     log("csv_postprocessing", 0)
-    process_trajectory_csv_file(raw_csv, processed_csv)
+    process_trajectory_csv_file(
+        raw_csv,
+        processed_csv,
+        on_progress=lambda pct: log("csv_postprocessing", pct),
+    )
     log("csv_postprocessing", 100)
 
     # ── Stage 5: Plot annotated video from processed CSV ──
