@@ -3,7 +3,11 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 
 const git = (fmt) =>
-  execSync(`git log -1 --format=${fmt} --date=short`).toString().trim();
+  execSync(
+    `git log -1 --oneline -E --format=${fmt} --date=short --grep='^(feat|fix|refactor)'`,
+  )
+    .toString()
+    .trim();
 
 export default defineConfig({
   define: {
