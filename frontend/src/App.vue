@@ -118,9 +118,10 @@ export default {
   max-width: 320px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  background: var(--text-primary);
-  color: #fff;
+  background: var(--accent-light);
+  color: var(--accent);
   font-size: 12px;
+  font-weight: bold;
   line-height: 1.5;
   white-space: pre-wrap;
   text-align: left;
